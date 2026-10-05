@@ -489,6 +489,22 @@ async function confirmBatchImportStudents() {
 
     try {
         const client = getSupabaseClient();
+        
+        // 1. Try RPC procedure first (SECURITY DEFINER bypasses RLS issues)
+        try {
+            const res = await callRpc('import_students_batch', { p_students: parsedImportStudents });
+            if (res && res.success) {
+                showToast(`Berhasil mengimpor ${res.count || parsedImportStudents.length} data siswa!`, 'success');
+                document.getElementById('importPreviewCard').style.display = 'none';
+                parsedImportStudents = [];
+                refreshStudentListTable();
+                return;
+            }
+        } catch (rpcErr) {
+            console.warn('RPC import_students_batch fallback to direct upsert:', rpcErr);
+        }
+
+        // 2. Direct client upsert fallback
         const { data, error } = await client.from('students').upsert(parsedImportStudents, { onConflict: 'nis' });
 
         if (error) {

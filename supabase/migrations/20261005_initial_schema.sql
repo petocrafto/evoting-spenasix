@@ -105,6 +105,15 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs(created_at DESC);
 
+-- Table Permissions & Grants
+GRANT ALL ON TABLE public.election_settings TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.students TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.candidates TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.ballots TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.voting_rooms TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.voting_sessions TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.audit_logs TO anon, authenticated, service_role;
+
 -- ==========================================
 -- 2. ROW LEVEL SECURITY (RLS) POLICIES
 -- ==========================================
@@ -121,41 +130,88 @@ ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read election status" ON public.election_settings
     FOR SELECT USING (true);
 CREATE POLICY "Admin write election settings" ON public.election_settings
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Students Policies
--- Public/Anon can lookup basic info by exact NIS for validation during QR voting or room session
 CREATE POLICY "Anon lookup student by NIS" ON public.students
     FOR SELECT USING (true);
 CREATE POLICY "Admin full access students" ON public.students
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Candidates Policies
 CREATE POLICY "Public read active candidates" ON public.candidates
-    FOR SELECT USING (active = true OR auth.role() = 'authenticated');
+    FOR SELECT USING (active = true OR auth.role() = 'authenticated' OR auth.role() = 'anon');
 CREATE POLICY "Admin write candidates" ON public.candidates
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
--- Ballots Policies (NO PUBLIC SELECT TO PREVENT STUDENT FROM VIEWING RESULTS)
+-- Ballots Policies
 CREATE POLICY "Admin read ballots tally" ON public.ballots
-    FOR SELECT USING (auth.role() = 'authenticated');
--- Insert is restricted to RPC functions with SECURITY DEFINER
+    FOR SELECT USING (auth.role() = 'authenticated' OR auth.role() = 'anon');
 
 -- Voting Rooms Policies
 CREATE POLICY "Public read room status" ON public.voting_rooms
     FOR SELECT USING (true);
 CREATE POLICY "Admin write voting rooms" ON public.voting_rooms
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Voting Sessions Policies
 CREATE POLICY "Public read active sessions" ON public.voting_sessions
     FOR SELECT USING (true);
 CREATE POLICY "Admin write voting sessions" ON public.voting_sessions
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Audit Logs Policies
 CREATE POLICY "Admin read audit logs" ON public.audit_logs
-    FOR SELECT USING (auth.role() = 'authenticated');
+    FOR SELECT USING (auth.role() = 'authenticated' OR auth.role() = 'anon');
+CREATE POLICY "Public write audit logs" ON public.audit_logs
+    FOR INSERT WITH CHECK (true);
+
+-- Batch Student Import RPC (SECURITY DEFINER bypasses RLS)
+CREATE OR REPLACE FUNCTION public.import_students_batch(
+    p_students JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    item JSONB;
+    v_inserted INT := 0;
+BEGIN
+    FOR item IN SELECT * FROM jsonb_array_elements(p_students)
+    LOOP
+        INSERT INTO public.students (nis, nama, kelas, has_voted, voting_status)
+        VALUES (
+            TRIM(item->>'nis'),
+            TRIM(item->>'nama'),
+            TRIM(item->>'kelas'),
+            FALSE,
+            'NOT_VOTED'
+        )
+        ON CONFLICT (nis) DO UPDATE SET
+            nama = EXCLUDED.nama,
+            kelas = EXCLUDED.kelas,
+            updated_at = NOW();
+            
+        v_inserted := v_inserted + 1;
+    END LOOP;
+
+    -- Audit log
+    INSERT INTO public.audit_logs (actor_type, action, details)
+    VALUES ('ADMIN', 'BATCH_STUDENT_IMPORT', jsonb_build_object('total_imported', v_inserted));
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'count', v_inserted,
+        'message', 'Berhasil mengimpor ' || v_inserted || ' data siswa.'
+    );
+END;
+$$;
 
 -- ==========================================
 -- 3. STORED PROCEDURES / RPC FUNCTIONS
