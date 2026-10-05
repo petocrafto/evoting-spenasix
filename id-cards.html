@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cetak ID Card & QR Siswa - OSIS Candra Kirana SPENASIX Divisi 9</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- QRCode JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        .id-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .id-card-template {
+            width: 340px;
+            height: 215px;
+            background: #ffffff;
+            border: 2px solid var(--primary-navy);
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            box-sizing: border-box;
+            font-family: var(--font-sans);
+            page-break-inside: avoid;
+        }
+        .id-card-header {
+            background-color: var(--primary-navy);
+            color: #ffffff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--accent-gold);
+        }
+        .id-card-title {
+            font-size: 0.75rem;
+            font-weight: 800;
+            margin: 0;
+            line-height: 1.1;
+        }
+        .id-card-sub {
+            font-size: 0.65rem;
+            color: #cbd5e1;
+        }
+        .id-card-body {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 6px 0;
+        }
+        .id-card-photo {
+            width: 75px;
+            height: 95px;
+            background-color: #e2e8f0;
+            border: 1px solid var(--border-color-dark);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            color: #64748b;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .id-card-details {
+            flex: 1;
+            font-size: 0.75rem;
+            line-height: 1.4;
+        }
+        .id-card-details label {
+            font-size: 0.65rem;
+            color: #64748b;
+            display: block;
+            font-weight: 600;
+        }
+        .id-card-details span {
+            font-weight: 700;
+            color: var(--primary-navy);
+            display: block;
+        }
+        .id-card-qr-container {
+            width: 70px;
+            height: 70px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .id-card-footer {
+            text-align: center;
+            font-size: 0.6rem;
+            font-weight: 600;
+            color: #64748b;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 4px;
+        }
+        @media print {
+            header, footer, .no-print { display: none !important; }
+            body { background: #ffffff; margin: 0; padding: 0; }
+            .main-container { max-width: none; padding: 0; }
+            .id-card-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="school-header no-print">
+        <div class="header-container">
+            <div class="brand-wrapper">
+                <a href="index.html" style="text-decoration:none;" class="brand-logo">CK</a>
+                <div class="brand-text-container">
+                    <span class="brand-title">OSIS Candra Kirana</span>
+                    <div class="brand-sub">
+                        <span class="brand-sub1">SPENASIX</span> • <span class="brand-sub2">Divisi 9</span>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Cetak ID Card</button>
+                <a href="index.html" class="btn btn-secondary btn-sm" style="color:#ffffff; background:rgba(255,255,255,0.15); border-color:transparent;">← Kembali</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        
+        <div class="card no-print">
+            <div class="card-header">
+                <h2 class="card-title">Generator ID Card Siswa & QR Code</h2>
+                <p class="card-subtitle">Pilih siswa atau masukkan daftar NIS untuk membuat ID Card fisik siap cetak.</p>
+            </div>
+            
+            <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:end;">
+                <div style="flex:1; min-width:200px;">
+                    <label class="form-label">Filter Kelas:</label>
+                    <select id="selectCardKelas" class="form-control" onchange="renderSampleOrFetchedCards()">
+                        <option value="ALL">-- Semua Kelas --</option>
+                        <option value="9A">Kelas 9A</option>
+                        <option value="9B">Kelas 9B</option>
+                        <option value="9C">Kelas 9C</option>
+                        <option value="9D">Kelas 9D</option>
+                    </select>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-primary" onclick="window.print()">🖨️ Cetak Seluruh Card</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Printable ID Card Grid -->
+        <div id="idCardGridContainer" class="id-card-grid">
+            <!-- Rendered dynamically -->
+        </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        const sampleStudents = [
+            { nis: '1234', nama: 'Ahmad Fulan', kelas: '9A' },
+            { nis: '1235', nama: 'Budi Santoso', kelas: '9A' },
+            { nis: '1236', nama: 'Citra Lestari', kelas: '9B' },
+            { nis: '1237', nama: 'Dewa Pratama', kelas: '9B' },
+            { nis: '1238', nama: 'Eka Rahmawati', kelas: '9C' },
+            { nis: '1239', nama: 'Farhan Rizky', kelas: '9C' }
+        ];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await renderSampleOrFetchedCards();
+        });
+
+        async function renderSampleOrFetchedCards() {
+            const container = document.getElementById('idCardGridContainer');
+            container.innerHTML = '';
+
+            let list = sampleStudents;
+            const filterKelas = document.getElementById('selectCardKelas').value;
+
+            try {
+                const client = getSupabaseClient();
+                if (client) {
+                    let q = client.from('students').select('*').order('kelas').order('nama');
+                    if (filterKelas !== 'ALL') q = q.eq('kelas', filterKelas);
+                    const { data: dbStudents } = await q;
+                    if (dbStudents && dbStudents.length > 0) {
+                        list = dbStudents;
+                    }
+                }
+            } catch (e) {
+                console.log('Using sample list for cards');
+            }
+
+            if (filterKelas !== 'ALL') {
+                list = list.filter(s => s.kelas === filterKelas);
+            }
+
+            list.forEach((s, idx) => {
+                const card = document.createElement('div');
+                card.className = 'id-card-template';
+                const canvasId = `qr-canvas-${s.nis}-${idx}`;
+
+                card.innerHTML = `
+                    <div class="id-card-header">
+                        <div>
+                            <div class="id-card-title">OSIS CANDRA KIRANA</div>
+                            <div class="id-card-sub">SPENASIX • DIVISI 9</div>
+                        </div>
+                        <div style="font-size:0.6rem; font-weight:800; color:var(--accent-gold);">KARTU PEMILIH</div>
+                    </div>
+                    <div class="id-card-body">
+                        <div class="id-card-photo">[ FOTO ]</div>
+                        <div class="id-card-details">
+                            <div><label>NAMA LENGKAP:</label><span>${escapeHtml(s.nama)}</span></div>
+                            <div style="margin-top:4px;"><label>NIS (4 DIGIT):</label><span style="font-size:0.9rem; color:var(--primary-blue);">${escapeHtml(s.nis)}</span></div>
+                            <div style="margin-top:4px;"><label>KELAS:</label><span>${escapeHtml(s.kelas)}</span></div>
+                        </div>
+                        <div class="id-card-qr-container">
+                            <canvas id="${canvasId}"></canvas>
+                        </div>
+                    </div>
+                    <div class="id-card-footer">
+                        QR Code hanya berisi 4 Digit NIS (${s.nis}) • Tunjukkan pada Panitia Pemilihan
+                    </div>
+                `;
+                container.appendChild(card);
+
+                // Render QR Code (ONLY 4-digit NIS)
+                setTimeout(() => {
+                    const canvas = document.getElementById(canvasId);
+                    if (canvas && typeof QRCode !== 'undefined') {
+                        QRCode.toCanvas(canvas, s.nis, { width: 68, margin: 1 }, function (error) {
+                            if (error) console.error(error);
+                        });
+                    }
+                }, 50);
+            });
+        }
+    </script>
+</body>
+</html>

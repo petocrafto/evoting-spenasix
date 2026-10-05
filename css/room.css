@@ -1,0 +1,124 @@
+/*
+  Bilik Voting Terminal CSS
+  OSIS Candra Kirana SPENASIX Divisi 9
+*/
+
+.room-terminal-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Room Identity Bar */
+.room-status-bar {
+  background-color: var(--primary-navy);
+  color: #ffffff;
+  padding: 0.875rem 1.25rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-left: 5px solid var(--accent-gold);
+}
+
+.room-id-badge {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--accent-gold);
+}
+
+.room-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+}
+
+.indicator-dot.ready { background-color: var(--status-success); }
+.indicator-dot.waiting { background-color: var(--status-warning); }
+.indicator-dot.voting { background-color: var(--status-info); }
+.indicator-dot.offline { background-color: #ef4444; }
+
+/* Activation Form */
+.activation-card {
+  max-width: 440px;
+  margin: 3rem auto;
+  text-align: center;
+}
+
+.pin-input {
+  letter-spacing: 0.3em;
+  font-size: 1.75rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* Standby / Waiting Screen */
+.standby-screen {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  background-color: #ffffff;
+  border-radius: var(--radius-md);
+  border: 2px dashed var(--border-color-dark);
+}
+
+.standby-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: pulse-slow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.03); }
+}
+
+.standby-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary-navy);
+  margin-bottom: 0.5rem;
+}
+
+.standby-sub {
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+/* Active Student Banner */
+.welcome-student-banner {
+  background-color: #dbeafe;
+  border: 1px solid #93c5fd;
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.welcome-text-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--primary-navy);
+}
+
+.session-timer {
+  font-weight: 700;
+  font-size: 0.95rem;
+  background-color: #1e40af;
+  color: #ffffff;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+}

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Bilik Voting - OSIS Candra Kirana SPENASIX Divisi 9</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/vote.css">
+    <link rel="stylesheet" href="css/room.css">
+</head>
+<body>
+
+    <!-- Header Identity -->
+    <header class="school-header">
+        <div class="header-container">
+            <div class="brand-wrapper">
+                <a href="index.html" style="text-decoration:none;" class="brand-logo">CK</a>
+                <div class="brand-text-container">
+                    <span class="brand-title">OSIS Candra Kirana</span>
+                    <div class="brand-sub">
+                        <span class="brand-sub1">SPENASIX</span> • <span class="brand-sub2">Divisi 9</span>
+                    </div>
+                </div>
+            </div>
+            <div class="brand-badge" style="background:#0284c7; border-color:#38bdf8;">TERMINAL BILIK VOTING</div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="main-container">
+        <div class="room-terminal-wrapper">
+
+            <!-- 1. ROOM ACTIVATION CARD (Displayed if device token is missing) -->
+            <div id="roomActivationCard" class="card activation-card">
+                <h2 class="card-title">Aktivasi Komputer Bilik</h2>
+                <p class="card-subtitle">Masukkan ID Bilik dan PIN 6 digit unik dari panitia.</p>
+
+                <form onsubmit="submitRoomActivation(event)" style="margin-top:1.5rem;">
+                    <div class="form-group">
+                        <label class="form-label" for="activationRoomCode">ID Bilik</label>
+                        <input type="text" id="activationRoomCode" class="form-control" style="text-transform:uppercase; text-align:center; font-weight:700; font-size:1.1rem;" placeholder="BILIK-01" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="activationPin">PIN Aktivasi 6 Digit</label>
+                        <input type="password" id="activationPin" class="form-control pin-input" placeholder="******" maxlength="6" pattern="\d{6}" inputmode="numeric" required />
+                    </div>
+
+                    <button type="submit" id="btnActivateRoom" class="btn btn-primary btn-block btn-lg" style="margin-top:1rem;">
+                        Aktifkan Bilik Ini
+                    </button>
+                </form>
+            </div>
+
+            <!-- 2. ROOM TERMINAL CARD (Displayed once activated) -->
+            <div id="roomTerminalCard" style="display:none;">
+
+                <!-- Room Identity Status Bar -->
+                <div class="room-status-bar">
+                    <div class="room-id-badge" id="displayRoomCode">BILIK-01</div>
+                    <div class="room-indicator">
+                        <div id="roomIndicatorDot" class="indicator-dot ready"></div>
+                        <span id="displayRoomStatusText">SIAP</span>
+                    </div>
+                </div>
+
+                <!-- STATE A: STANDBY SCREEN (Waiting for Admin assignment) -->
+                <div id="roomStandbyScreen" class="standby-screen">
+                    <div class="standby-icon">⏳</div>
+                    <h2 class="standby-title">BILIK SIAP</h2>
+                    <p class="standby-sub">Menunggu penugasan siswa dari panitia...</p>
+                </div>
+
+                <!-- STATE B: VOTING SCREEN (Displayed automatically via Supabase Realtime) -->
+                <div id="roomVotingScreen" style="display:none;">
+                    
+                    <!-- Welcome Student Banner -->
+                    <div class="welcome-student-banner">
+                        <div>
+                            <span style="font-size:0.85rem; color:var(--text-muted); display:block;">Selamat Datang:</span>
+                            <span id="displayWelcomeStudentName" class="welcome-text-name">Ahmad Fulan</span>
+                            <span id="displayWelcomeStudentKelas" style="font-weight:700; color:var(--secondary-slate);"> (9A)</span>
+                        </div>
+                        <div class="session-timer">
+                            Sisa Waktu: <span id="sessionCountdownText">10:00</span>
+                        </div>
+                    </div>
+
+                    <div style="background:#ffffff; padding:1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); margin-bottom:1.5rem;">
+                        <h2 class="card-title" style="margin:0;">Silakan Pilih Kandidat Ketua OSIS</h2>
+                        <p class="card-subtitle" style="margin:0.25rem 0 0 0;">Tekan tombol di bawah foto kandidat yang Anda pilih.</p>
+                    </div>
+
+                    <!-- Room Candidate Grid -->
+                    <div id="roomCandidateGrid" class="candidate-grid">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- STATE C: SUCCESS SCREEN (Displays after vote confirmed, auto-resets) -->
+                <div id="roomSuccessScreen" class="card vote-success-card" style="display:none;">
+                    <div class="success-icon">✅</div>
+                    <h2 class="success-title">SUARA BERHASIL TERCATAT</h2>
+                    <p class="success-message">
+                        Terima kasih telah berpartisipasi dalam Pemilihan OSIS Candra Kirana SPENASIX Divisi 9.<br><br>
+                        Silakan tinggalkan bilik. Layar akan kembali siap dalam <strong id="autoResetCountdownText">5</strong> detik.
+                    </p>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ROOM CONFIRMATION MODAL -->
+    <div id="roomConfirmationModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Konfirmasi Pilihan Suara Bilik</h3>
+            </div>
+            <div style="text-align:center; padding:1rem 0;">
+                <p style="color:var(--text-muted); font-size:0.95rem;">Anda memilih:</p>
+                <div id="roomConfirmCandidateNum" style="font-size:1.5rem; font-weight:800; color:var(--primary-navy); margin-top:0.25rem;">Kandidat 02</div>
+                <div id="roomConfirmCandidateName" style="font-size:1.1rem; font-weight:700; color:var(--primary-blue); margin-bottom:1rem;">Budi Santoso & Partner</div>
+                <p style="font-size:0.875rem; color:var(--status-warning); background:#fff7ed; border:1px solid #ffedd5; padding:0.75rem; border-radius:var(--radius-sm); font-weight:600;">
+                    ⚠️ Pastikan pilihan Anda sudah benar. Suara yang telah dikonfirmasi tidak dapat diubah.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeRoomConfirmationModal()">[ KEMBALI ]</button>
+                <button type="button" id="btnConfirmRoomVote" class="btn btn-success" onclick="confirmRoomVoteSubmission()">[ KONFIRMASI SUARA ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="school-footer">
+        <p>&copy; 2026 OSIS Candra Kirana SPENASIX Divisi 9</p>
+    </footer>
+
+    <!-- JS Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/room.js"></script>
+</body>
+</html>

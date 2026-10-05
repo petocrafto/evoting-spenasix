@@ -1,0 +1,196 @@
+/*
+  Voting Page CSS
+  OSIS Candra Kirana SPENASIX Divisi 9
+*/
+
+.vote-wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* NIS Input Step */
+.nis-card {
+  text-align: center;
+  max-width: 480px;
+  margin: 2rem auto;
+}
+
+.nis-input-large {
+  font-size: 2rem;
+  letter-spacing: 0.25em;
+  text-align: center;
+  font-weight: 800;
+  color: var(--primary-navy);
+  padding: 0.75rem;
+  border: 2px solid var(--primary-blue);
+  border-radius: var(--radius-md);
+  width: 100%;
+  max-width: 280px;
+  margin: 1rem auto;
+}
+
+.student-info-bar {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.student-name-text {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--primary-navy);
+}
+
+.student-nis-badge {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #1e40af;
+  background-color: #dbeafe;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+}
+
+/* Candidate Grid */
+.candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.candidate-card {
+  background: #ffffff;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+.candidate-card:hover {
+  border-color: var(--primary-blue);
+  transform: translateY(-2px);
+}
+
+.candidate-card.selected {
+  border-color: var(--primary-blue);
+  background-color: #f8fafc;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.25);
+}
+
+.candidate-num-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background-color: var(--primary-navy);
+  color: var(--accent-gold);
+  border: 2px solid var(--accent-gold);
+  font-size: 1.1rem;
+  font-weight: 800;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  box-shadow: var(--shadow-sm);
+}
+
+.candidate-img-container {
+  width: 100%;
+  height: 220px;
+  background-color: #e2e8f0;
+  overflow: hidden;
+  position: relative;
+}
+
+.candidate-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.candidate-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.candidate-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary-navy);
+  margin-bottom: 0.5rem;
+}
+
+.candidate-visi {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  flex: 1;
+}
+
+.candidate-misi-toggle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.candidate-misi-list {
+  display: none;
+  font-size: 0.825rem;
+  color: var(--secondary-slate);
+  margin-bottom: 1rem;
+  padding-left: 1.2rem;
+}
+
+.candidate-misi-list.show {
+  display: block;
+}
+
+/* Success Card */
+.vote-success-card {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  max-width: 540px;
+  margin: 2rem auto;
+  border-top: 6px solid var(--status-success);
+}
+
+.success-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+  color: var(--status-success);
+}
+
+.success-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary-navy);
+  margin-bottom: 0.75rem;
+}
+
+.success-message {
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}

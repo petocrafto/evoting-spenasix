@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Voting OSIS Candra Kirana SPENASIX Divisi 9</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .portal-card {
+            background-color: #ffffff;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 2rem 1.5rem;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+        .portal-card:hover {
+            border-color: var(--primary-blue);
+            transform: translateY(-3px);
+        }
+        .portal-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-navy);
+        }
+        .portal-title {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--primary-navy);
+            margin-bottom: 0.5rem;
+        }
+        .portal-desc {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        .hero-banner {
+            background: linear-gradient(135deg, #0f2942 0%, #1e3a8a 100%);
+            color: #ffffff;
+            border-radius: var(--radius-md);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            border-bottom: 4px solid var(--accent-gold);
+            box-shadow: var(--shadow-md);
+        }
+        .hero-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            margin-bottom: 0.5rem;
+        }
+        .hero-sub {
+            font-size: 1.1rem;
+            color: #cbd5e1;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Identity -->
+    <header class="school-header">
+        <div class="header-container">
+            <div class="brand-wrapper">
+                <div class="brand-logo">CK</div>
+                <div class="brand-text-container">
+                    <span class="brand-title">OSIS Candra Kirana</span>
+                    <div class="brand-sub">
+                        <span class="brand-sub1">SPENASIX</span> • <span class="brand-sub2">Divisi 9</span>
+                    </div>
+                </div>
+            </div>
+            <div class="brand-badge">SISTEM E-VOTING RESMI</div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        
+        <div class="hero-banner">
+            <h1 class="hero-title">Pemilihan Ketua OSIS Candra Kirana</h1>
+            <p class="hero-sub">SPENASIX • Divisi 9</p>
+            <p style="font-size: 0.95rem; max-width: 600px; margin: 0 auto; color: #e2e8f0;">
+                Selamat datang di portal e-voting resmi. Gunakan ID Card dengan QR Code atau mintalah bantuan panitia di Mode Bilik Voting.
+            </p>
+        </div>
+
+        <div class="portal-grid">
+            
+            <!-- Voting Method A: QR / NIS -->
+            <div class="portal-card">
+                <div>
+                    <div class="portal-icon">📷</div>
+                    <h2 class="portal-title">Voting ID Card / QR</h2>
+                    <p class="portal-desc">
+                        Gunakan kamera HP atau masukkan NIS 4 digit yang tertera pada ID Card siswa untuk memilih kandidat secara langsung.
+                    </p>
+                </div>
+                <a href="vote.html" class="btn btn-primary btn-block btn-lg">Buka QR Voting</a>
+            </div>
+
+            <!-- Voting Method B: Mode Bilik -->
+            <div class="portal-card">
+                <div>
+                    <div class="portal-icon">🖥️</div>
+                    <h2 class="portal-title">Mode Bilik Voting</h2>
+                    <p class="portal-desc">
+                        Buka terminal komputer bilik voting (BILIK-01, BILIK-02). Khusus untuk siswa yang ditugaskan oleh panitia.
+                    </p>
+                </div>
+                <a href="voting-room.html" class="btn btn-primary btn-block btn-lg">Buka Terminal Bilik</a>
+            </div>
+
+            <!-- Admin Portal -->
+            <div class="portal-card">
+                <div>
+                    <div class="portal-icon">🛡️</div>
+                    <h2 class="portal-title">Portal Panitia / Admin</h2>
+                    <p class="portal-desc">
+                        Dashboard manajemen pemilihan, aktivasi bilik, penugasan siswa, statistik realtime, dan kelola data.
+                    </p>
+                </div>
+                <a href="admin.html" class="btn btn-secondary btn-block btn-lg">Login Admin</a>
+            </div>
+
+            <!-- ID Card & QR Generator Tool -->
+            <div class="portal-card">
+                <div>
+                    <div class="portal-icon">🪪</div>
+                    <h2 class="portal-title">Cetak ID Card & QR</h2>
+                    <p class="portal-desc">
+                        Cetak ID Card resmi siswa SPENASIX Divisi 9 beserta QR Code NIS 4 digit siap pakai untuk hari pemilihan.
+                    </p>
+                </div>
+                <a href="id-cards.html" class="btn btn-secondary btn-block btn-lg">Cetak ID Card</a>
+            </div>
+
+        </div>
+
+        <!-- Rules & Privacy Guide Card -->
+        <div class="card" style="margin-top: 2rem;">
+            <div class="card-header">
+                <h3 class="card-title">Prinsip & Keamanan Pemilihan</h3>
+            </div>
+            <ul style="padding-left: 1.25rem; font-size: 0.95rem; color: var(--secondary-slate); line-height: 1.7;">
+                <li><strong>Maksimal 1 Suara:</strong> Setiap siswa hanya mempunyai 1 hak suara yang divalidasi secara ketat oleh sistem.</li>
+                <li><strong>Kerahasiaan Terjamin:</strong> Pilihan kandidat bersifat anonim. Panitia hanya dapat melihat status <em>Sudah Voting</em> tanpa mengetahui kandidat mana yang Anda pilih.</li>
+                <li><strong>Panitia Tidak Memilih:</strong> Panitia hanya bertugas menetapkan bilik. Siswa wajib memilih kandidatnya sendiri.</li>
+            </ul>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="school-footer">
+        <p>&copy; 2026 OSIS Candra Kirana SPENASIX Divisi 9. Sistem E-Voting Resmi.</p>
+    </footer>
+
+    <!-- Supabase & App JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

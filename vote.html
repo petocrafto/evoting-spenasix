@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voting ID Card - OSIS Candra Kirana SPENASIX Divisi 9</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/vote.css">
+    <!-- HTML5 QR Code Camera Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+    <!-- Header Identity -->
+    <header class="school-header">
+        <div class="header-container">
+            <div class="brand-wrapper">
+                <a href="index.html" style="text-decoration:none;" class="brand-logo">CK</a>
+                <div class="brand-text-container">
+                    <span class="brand-title">OSIS Candra Kirana</span>
+                    <div class="brand-sub">
+                        <span class="brand-sub1">SPENASIX</span> • <span class="brand-sub2">Divisi 9</span>
+                    </div>
+                </div>
+            </div>
+            <a href="index.html" class="btn btn-secondary btn-sm" style="color:#ffffff; background:rgba(255,255,255,0.15); border-color:transparent;">← Kembali</a>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        <div class="vote-wrapper">
+
+            <!-- STEP 1: NIS INPUT / QR SCAN VERIFICATION -->
+            <div id="stepNisInput" class="card nis-card">
+                <h2 class="card-title">Verifikasi ID Card / NIS</h2>
+                <p class="card-subtitle">Scan QR Code ID Card fisik siswa atau ketik 4 digit NIS di bawah ini.</p>
+
+                <!-- Camera QR Scanner Container (Active by Default) -->
+                <div style="margin-bottom:1.25rem;">
+                    <div id="qrCameraScannerContainer" style="display:block; margin-bottom:1rem; border:2px dashed var(--primary-blue); border-radius:var(--radius-md); padding:0.5rem; background:#f0f9ff;">
+                        <div id="reader" style="width:100%;"></div>
+                        <p style="font-size:0.85rem; color:var(--primary-navy); font-weight:600; margin-top:0.5rem;">📷 Kamera Aktif: Arahkan ke QR Code ID Card Absen Siswa</p>
+                    </div>
+                    <button type="button" id="btnToggleCameraScanner" class="btn btn-secondary btn-block btn-sm" onclick="toggleCameraScanner()">
+                        🔄 Matikan / Nyalakan Ulang Kamera
+                    </button>
+                </div>
+
+                <form onsubmit="submitNisForm(event)">
+                    <label class="form-label" style="text-align:center;">Atau Masukkan NIS (4 Digit):</label>
+                    <input type="text" id="nisInput" class="nis-input-large" placeholder="1234" maxlength="4" pattern="\d{4}" inputmode="numeric" autocomplete="off" autofocus required />
+                    
+                    <div id="nisErrorMessage" style="color:var(--status-danger); font-size:0.9rem; font-weight:600; margin-bottom:1rem; display:none;"></div>
+
+                    <button type="submit" id="btnVerifyNis" class="btn btn-primary btn-block btn-lg">
+                        Lanjutkan Voting →
+                    </button>
+                </form>
+            </div>
+
+            <!-- STEP 2: CANDIDATE SELECTION -->
+            <div id="stepCandidateSelect" style="display:none;">
+                
+                <!-- Student Verified Info Banner -->
+                <div class="student-info-bar">
+                    <div>
+                        <span style="font-size:0.85rem; color:var(--text-muted); display:block;">Pemilih Terverifikasi:</span>
+                        <span id="displayStudentName" class="student-name-text">Nama Siswa</span>
+                        <span id="displayStudentKelas" style="font-size:0.95rem; font-weight:600; color:var(--secondary-slate);"> (9A)</span>
+                    </div>
+                    <div>
+                        <span class="student-nis-badge">NIS: <span id="displayStudentNis">1234</span></span>
+                    </div>
+                </div>
+
+                <div class="card-header" style="background:#ffffff; padding:1rem; border-radius:var(--radius-md); margin-bottom:1.5rem;">
+                    <h2 class="card-title" style="margin:0;">Silakan Pilih Kandidat Ketua OSIS</h2>
+                    <p class="card-subtitle" style="margin:0.25rem 0 0 0;">Tekan tombol di bawah foto kandidat yang Anda pilih.</p>
+                </div>
+
+                <!-- Candidate Grid -->
+                <div id="candidateGridContainer" class="candidate-grid">
+                    <!-- Loaded dynamically via js/vote.js -->
+                </div>
+            </div>
+
+            <!-- STEP 3: SUCCESS SCREEN -->
+            <div id="stepSuccess" class="card vote-success-card" style="display:none;">
+                <div class="success-icon">✅</div>
+                <h2 class="success-title">SUARA BERHASIL TERCATAT</h2>
+                <p class="success-message">
+                    Terima kasih telah berpartisipasi dalam Pemilihan OSIS Candra Kirana SPENASIX Divisi 9.<br><br>
+                    Suara Anda telah tersimpan secara aman dan anonim. Silakan tinggalkan bilik voting.
+                </p>
+                <div style="margin-top:2rem;">
+                    <a href="index.html" class="btn btn-primary btn-lg">Kembali ke Halaman Utama</a>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- CONFIRMATION MODAL -->
+    <div id="confirmationModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Konfirmasi Pilihan Suara</h3>
+            </div>
+            <div style="text-align:center; padding:1rem 0;">
+                <p style="color:var(--text-muted); font-size:0.95rem;">Anda telah memilih:</p>
+                <div id="confirmCandidateNum" style="font-size:1.5rem; font-weight:800; color:var(--primary-navy); margin-top:0.25rem;">Kandidat 02</div>
+                <div id="confirmCandidateName" style="font-size:1.1rem; font-weight:700; color:var(--primary-blue); margin-bottom:1rem;">Budi Santoso & Partner</div>
+                <p style="font-size:0.875rem; color:var(--status-warning); background:#fff7ed; border:1px solid #ffedd5; padding:0.75rem; border-radius:var(--radius-sm); font-weight:600;">
+                    ⚠️ Pastikan pilihan Anda sudah benar. Suara yang telah dikonfirmasi tidak dapat diubah.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeConfirmationModal()">[ KEMBALI ]</button>
+                <button type="button" id="btnConfirmVote" class="btn btn-success" onclick="confirmVoteSubmission()">[ KONFIRMASI SUARA ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="school-footer">
+        <p>&copy; 2026 OSIS Candra Kirana SPENASIX Divisi 9</p>
+    </footer>
+
+    <!-- JS Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/vote.js"></script>
+</body>
+</html>

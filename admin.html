@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Admin - OSIS Candra Kirana SPENASIX Divisi 9</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <!-- SheetJS CDN for Excel/CSV Import -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+    <!-- Header Identity -->
+    <header class="school-header">
+        <div class="header-container">
+            <div class="brand-wrapper">
+                <a href="index.html" style="text-decoration:none;" class="brand-logo">CK</a>
+                <div class="brand-text-container">
+                    <span class="brand-title">OSIS Candra Kirana</span>
+                    <div class="brand-sub">
+                        <span class="brand-sub1">SPENASIX</span> • <span class="brand-sub2">Divisi 9</span>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <span id="displayAdminEmail" style="font-size:0.85rem; color:#cbd5e1; font-weight:600;"></span>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="handleAdminLogout()">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        
+        <!-- 1. LOGIN CARD (Displayed when not logged in) -->
+        <div id="adminLoginCard" class="card" style="max-width:420px; margin:3rem auto;">
+            <div class="card-header" style="text-align:center;">
+                <h2 class="card-title">Login Admin Panitia</h2>
+                <p class="card-subtitle">Pemilihan OSIS Candra Kirana SPENASIX Divisi 9</p>
+            </div>
+            <form onsubmit="handleAdminLogin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="loginEmail">Email Admin</label>
+                    <input type="email" id="loginEmail" class="form-control" placeholder="admin@spenasix.sch.id" required />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required />
+                </div>
+
+                <button type="submit" id="btnLoginSubmit" class="btn btn-primary btn-block btn-lg">
+                    Login Sistem
+                </button>
+            </form>
+        </div>
+
+        <!-- 2. ADMIN DASHBOARD VIEW (Displayed when authenticated) -->
+        <div id="adminDashboardView" class="admin-layout" style="display:none;">
+
+            <!-- Navigation Tabs -->
+            <nav class="admin-tabs">
+                <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+                <button class="tab-btn" data-tab="assign" onclick="switchTab('assign')">🖥️ Mode Bilik Voting</button>
+                <button class="tab-btn" data-tab="students" onclick="switchTab('students')">👥 Kelola & Impor Siswa</button>
+                <button class="tab-btn" data-tab="candidates" onclick="switchTab('candidates')">🗳️ Kelola Kandidat</button>
+                <button class="tab-btn" data-tab="rooms" onclick="switchTab('rooms')">🔑 Kelola Bilik & PIN</button>
+                <button class="tab-btn" data-tab="election" onclick="switchTab('election')">⚙️ Pengaturan Election</button>
+                <button class="tab-btn" data-tab="audit" onclick="switchTab('audit')">📜 Audit Logs</button>
+            </nav>
+
+            <!-- TAB 1: DASHBOARD OVERVIEW -->
+            <div id="tab-dashboard" class="tab-pane">
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h2 class="card-title">Monitoring Realtime Pemilihan</h2>
+                    <div>Status Election: <span id="displayElectionStatusBadge" class="badge badge-ready">OPEN</span></div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-title">Total Siswa</span>
+                        <span id="statTotalStudents" class="stat-value">0</span>
+                        <span class="stat-sub">Terdaftar</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-title">Sudah Voting</span>
+                        <span id="statVotedStudents" class="stat-value" style="color:var(--status-success);">0</span>
+                        <span class="stat-sub">Suara masuk</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-title">Belum Voting</span>
+                        <span id="statNotVotedStudents" class="stat-value" style="color:var(--status-warning);">0</span>
+                        <span class="stat-sub">Belum memberikan suara</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-title">Partisipasi</span>
+                        <span id="statParticipationPct" class="stat-value" style="color:var(--primary-blue);">0%</span>
+                        <span class="stat-sub">Tingkat kehadiran</span>
+                    </div>
+                </div>
+
+                <!-- Grid Layout: Candidate Tally & Live Bilik Status -->
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.5rem; margin-bottom:1.5rem;">
+                    
+                    <!-- Candidate Vote Tally (ADMIN ONLY) -->
+                    <div class="card" style="margin-bottom:0;">
+                        <div class="card-header">
+                            <h3 class="card-title">Hasil Suara Kandidat (Agregat)</h3>
+                        </div>
+                        <div id="candidateTallyContainer">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Live Room Status Cards -->
+                    <div class="card" style="margin-bottom:0;">
+                        <div class="card-header">
+                            <h3 class="card-title">Status Komputer Bilik</h3>
+                        </div>
+                        <div id="adminLiveRoomCards" class="room-cards-grid">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Class Breakdown Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Statistik Kehadiran Per Kelas</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Kelas</th>
+                                    <th>Total Siswa</th>
+                                    <th>Sudah Voting</th>
+                                    <th>Belum Voting</th>
+                                </tr>
+                            </thead>
+                            <tbody id="classBreakdownTbody">
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- TAB 2: MODE BILIK ASSIGNMENT -->
+            <div id="tab-assign" class="tab-pane" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Assign Siswa ke Bilik Voting</h2>
+                        <p class="card-subtitle">Pilih siswa yang hadir, lalu tugaskan ke komputer bilik yang sedang READY.</p>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:1.25rem;">
+                        <div>
+                            <label class="form-label">Filter Kelas:</label>
+                            <select id="assignSelectKelas" class="form-control" onchange="filterAssignStudentList()">
+                                <option value="">-- Semua Kelas --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Cari Nama / NIS:</label>
+                            <input type="text" id="assignSearchStudent" class="form-control" placeholder="Cari..." oninput="filterAssignStudentList()" />
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>NIS</th>
+                                    <th>Nama Siswa</th>
+                                    <th>Kelas</th>
+                                    <th>Status Voting</th>
+                                    <th>Aksi Panitia</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assignStudentTbody">
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: KELOLA SISWA & IMPOR EXCEL -->
+            <div id="tab-students" class="tab-pane" style="display:none;">
+                <div class="card">
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h2 class="card-title">Impor Data Siswa (Excel / CSV)</h2>
+                            <p class="card-subtitle">Format kolom: <code>NIS (4 digit) | Nama Lengkap | Kelas</code></p>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="downloadStudentExcelTemplate()">📥 Unduh Format Excel Contoh</button>
+                    </div>
+
+                    <div class="import-drop-zone" onclick="document.getElementById('excelFileInput').click()">
+                        <div style="font-size:2rem; margin-bottom:0.5rem;">📁</div>
+                        <strong>Klik untuk memilih file Excel (.xlsx / .csv)</strong>
+                        <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">Sistem akan melakukan validasi 4-digit NIS dan duplikasi secara otomatis.</p>
+                        <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display:none;" onchange="handleExcelFileSelect(event)" />
+                    </div>
+
+                    <!-- Import Preview Container -->
+                    <div id="importPreviewCard" style="display:none; margin-top:1.5rem;">
+                        <h3 class="card-title">Preview Data Impor</h3>
+                        <div id="importErrorsBox" class="import-error-box" style="display:none;"></div>
+                        <div class="table-responsive" style="max-height:300px; margin-top:1rem;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>NIS</th>
+                                        <th>Nama</th>
+                                        <th>Kelas</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="importPreviewTbody"></tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:1rem; text-align:right;">
+                            <button type="button" id="btnConfirmImport" class="btn btn-success" onclick="confirmBatchImportStudents()">Proses Impor Data Siswa</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Master List Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Daftar Seluruh Siswa</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>NIS</th>
+                                    <th>Nama Siswa</th>
+                                    <th>Kelas</th>
+                                    <th>Status Voting</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentsListTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: KELOLA KANDIDAT -->
+            <div id="tab-candidates" class="tab-pane" style="display:none;">
+                <div class="card">
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h2 class="card-title">Daftar Kandidat Ketua OSIS</h2>
+                            <p class="card-subtitle">Kelola foto, nama, visi, dan misi kandidat yang akan tampil di 1 halaman layar voting siswa.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="openCandidateModal()">➕ Tambah Kandidat Baru</button>
+                    </div>
+                    <div id="adminCandidatesGrid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:1.5rem; margin-top:1rem;">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: KELOLA BILIK & PIN -->
+            <div id="tab-rooms" class="tab-pane" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Tambah Bilik Voting Baru</h2>
+                    </div>
+                    <form onsubmit="createNewVotingRoom(event)" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; align-items:end;">
+                        <div>
+                            <label class="form-label">ID Bilik (contoh: BILIK-05)</label>
+                            <input type="text" id="newRoomCode" class="form-control" placeholder="BILIK-05" required />
+                        </div>
+                        <div>
+                            <label class="form-label">PIN Aktivasi (6 Digit)</label>
+                            <div style="display:flex; gap:0.5rem;">
+                                <input type="text" id="newRoomPin" class="form-control" placeholder="583214" maxlength="6" pattern="\d{6}" required />
+                                <button type="button" class="btn btn-secondary" onclick="generateRandomPin()">Acak</button>
+                            </div>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary btn-block">Buat Bilik</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Daftar Bilik Voting Terdaftar</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID Bilik</th>
+                                    <th>Status</th>
+                                    <th>Status Aktivasi</th>
+                                    <th>Update Terakhir</th>
+                                    <th>Aksi Panitia</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminRoomsTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 6: PENGATURAN ELECTION -->
+            <div id="tab-election" class="tab-pane" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Kontrol Status Pemilihan (Election Control)</h2>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Nama Pemilihan</label>
+                        <input type="text" id="electionNameInput" class="form-control" readonly />
+                    </div>
+
+                    <p style="font-weight:600; margin-bottom:1rem;">Status Saat Ini: <span id="displayCurrentStatusText" style="color:var(--primary-blue); font-weight:800;">OPEN</span></p>
+
+                    <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary" onclick="updateElectionStatus('DRAFT')">Set DRAFT (Voting Belum Dibuka)</button>
+                        <button type="button" class="btn btn-success" onclick="updateElectionStatus('OPEN')">Set OPEN (Buka Voting)</button>
+                        <button type="button" class="btn btn-danger" onclick="updateElectionStatus('CLOSED')">Set CLOSED (Tutup Voting)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 7: AUDIT LOGS -->
+            <div id="tab-audit" class="tab-pane" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Catatan Aktivitas Sistem (Audit Logs)</h2>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Waktu</th>
+                                    <th>Aktor</th>
+                                    <th>Aksi</th>
+                                    <th>Detail Event</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditLogsTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ASSIGN BILIK MODAL -->
+    <div id="assignBilikModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Tugaskan Siswa ke Bilik</h3>
+            </div>
+            <input type="hidden" id="assignModalStudentId" />
+            <div style="margin-bottom:1.25rem;">
+                <label class="form-label">Siswa Terpilih:</label>
+                <div id="assignModalStudentInfo" style="font-weight:700; font-size:1.1rem; color:var(--primary-navy);">Ahmad Fulan (1234 - 9A)</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="assignModalRoomCode">Pilih Komputer Bilik Tujuan:</label>
+                <select id="assignSelectBilik" class="form-control">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAssignBilikModal()">[ BATAL ]</button>
+                <button type="button" class="btn btn-primary" onclick="executeStudentAssignment()">[ TUGASKAN KE BILIK ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CANDIDATE FORM MODAL -->
+    <div id="candidateModal" class="modal-overlay">
+        <div class="modal-content" style="max-width:620px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="candidateModalTitle">Tambah / Edit Kandidat</h3>
+            </div>
+            <form onsubmit="saveCandidateForm(event)">
+                <input type="hidden" id="candFormId" />
+
+                <div style="display:grid; grid-template-columns: 1fr 2fr; gap:1rem;">
+                    <div class="form-group">
+                        <label class="form-label" for="candFormNomor">Nomor Urut</label>
+                        <input type="number" id="candFormNomor" class="form-control" placeholder="1" min="1" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="candFormNama">Nama Pasangan Kandidat</label>
+                        <input type="text" id="candFormNama" class="form-control" placeholder="Ahmad Fulan & Partner" required />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="candFormFoto">URL Foto Kandidat (Link Gambarnya)</label>
+                    <input type="url" id="candFormFoto" class="form-control" placeholder="https://domain.com/foto-kandidat.jpg" required />
+                    <small style="color:var(--text-muted); font-size:0.75rem;">Tip: Masukkan URL foto berformat JPG/PNG dari internet atau storage Supabase.</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="candFormVisi">Visi Kandidat</label>
+                    <textarea id="candFormVisi" class="form-control" rows="3" placeholder="Wujudkan OSIS Candra Kirana SPENASIX Divisi 9 yang inovatif..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="candFormMisi">Misi Kandidat (Pisahkan Setiap Poin dengan Baris Baru)</label>
+                    <textarea id="candFormMisi" class="form-control" rows="4" placeholder="1. Mengembangkan proker unggulan&#10;2. Meningkatkan kolaborasi antar kelas&#10;3. Mengoptimalkan teknologi digital"></textarea>
+                </div>
+
+                <div class="form-group" style="display:flex; align-items:center; gap:0.5rem;">
+                    <input type="checkbox" id="candFormActive" checked />
+                    <label for="candFormActive" style="font-weight:600; cursor:pointer;">Aktifkan Kandidat dalam Pemilihan</label>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeCandidateModal()">[ BATAL ]</button>
+                    <button type="submit" id="btnSaveCandidate" class="btn btn-primary">[ SIMPAN KANDIDAT ]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="school-footer">
+        <p>&copy; 2026 OSIS Candra Kirana SPENASIX Divisi 9</p>
+    </footer>
+
+    <!-- JS Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
