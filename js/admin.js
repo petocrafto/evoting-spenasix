@@ -302,12 +302,46 @@ async function filterAssignStudentList() {
     });
 }
 
-function prepareAssignModal(studentId, name, nis, kelas) {
+async function prepareAssignModal(studentId, name, nis, kelas) {
     document.getElementById('assignModalStudentId').value = studentId;
     document.getElementById('assignModalStudentInfo').textContent = `${name} (${nis} - ${kelas})`;
 
+    const selectEl = document.getElementById('assignSelectBilik');
+    selectEl.innerHTML = '<option value="">-- Memuat daftar bilik... --</option>';
+
     const modal = document.getElementById('assignBilikModal');
     modal.classList.add('active');
+
+    try {
+        const client = getSupabaseClient();
+        const { data: rooms, error } = await client
+            .from('voting_rooms')
+            .select('*')
+            .order('room_code', { ascending: true });
+
+        selectEl.innerHTML = '';
+        if (error || !rooms || rooms.length === 0) {
+            selectEl.innerHTML = '<option value="">-- Belum ada bilik terdaftar --</option>';
+            return;
+        }
+
+        let hasReadyRoom = false;
+        rooms.forEach(r => {
+            const isAvailable = r.status === 'READY' || r.status === 'COMPLETED';
+            if (isAvailable) hasReadyRoom = true;
+
+            const label = `${r.room_code} (${r.status === 'READY' || r.status === 'COMPLETED' ? 'SIAP' : r.status === 'OFFLINE' ? 'OFFLINE - Perlu PIN Aktivasi' : 'SEDANG DIGUNAKAN'})`;
+            selectEl.innerHTML += `<option value="${escapeHtml(r.room_code)}" ${!isAvailable ? 'disabled' : ''}>${escapeHtml(label)}</option>`;
+        });
+
+        if (!hasReadyRoom) {
+            showToast('Semua bilik sedang OFFLINE atau sedang digunakan. Silakan aktifkan bilik terlebih dahulu di voting-room.html dengan PIN.', 'warning');
+        }
+
+    } catch (err) {
+        console.error('Error fetching rooms for assign modal:', err);
+        selectEl.innerHTML = '<option value="">-- Gagal memuat data bilik --</option>';
+    }
 }
 
 function closeAssignBilikModal() {
@@ -317,12 +351,21 @@ function closeAssignBilikModal() {
 
 async function executeStudentAssignment() {
     const studentId = document.getElementById('assignModalStudentId').value;
-    const roomCode = document.getElementById('assignModalRoomCode').value;
+    const selectEl = document.getElementById('assignSelectBilik');
+    const roomCode = selectEl ? selectEl.value : null;
 
-    if (!roomCode) {
-        showToast('Pilih bilik tujuan terlebih dahulu.', 'error');
+    if (!studentId) {
+        showToast('Pilih siswa terlebih dahulu.', 'error');
         return;
     }
+
+    if (!roomCode) {
+        showToast('Pilih bilik tujuan yang berstatus SIAP terlebih dahulu.', 'error');
+        return;
+    }
+
+    const btn = document.querySelector('#assignBilikModal .btn-primary');
+    if (btn) btn.disabled = true;
 
     try {
         const response = await callRpc('assign_student_to_room', {
@@ -341,6 +384,8 @@ async function executeStudentAssignment() {
     } catch (err) {
         console.error('Assignment error:', err);
         showToast('Terjadi kesalahan saat menugaskan siswa.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
