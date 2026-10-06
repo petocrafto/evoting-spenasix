@@ -2,176 +2,290 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Voting OSIS Candra Kirana SPENASIX Divisi 9</title>
-    <link rel="stylesheet" href="css/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0f2942">
+    <meta name="description" content="Sistem E-Voting OSIS Candra Kirana SPENASIX Divisi 9 - Otomatis menuju halaman Voting ID Card / QR.">
+    <meta name="robots" content="noindex">
+    <title>Menyiapkan Voting... &bull; E-Voting OSIS SPENASIX Divisi 9</title>
+
+    <!-- Prefetch halaman tujuan agar terasa instan, terutama di HP kelas bawah -->
+    <link rel="prefetch" href="vote.html">
+    <link rel="prefetch" href="css/style.css">
+    <link rel="prefetch" href="css/vote.css">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://unpkg.com">
+
+    <!-- Fallback bila JavaScript dimatikan: langsung lompat ke halaman voting -->
+    <noscript><meta http-equiv="refresh" content="0; url=vote.html"></noscript>
+
     <style>
-        .portal-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
+        /* ================================================================
+           SPLASH LOADING SCREEN (Ringan: tanpa gambar & tanpa library.
+           Hanya animasi transform/opacity agar aman di HP kelas bawah.)
+           ================================================================ */
+        :root {
+            --navy: #0f2942;
+            --navy-mid: #16386b;
+            --navy-light: #1e3a8a;
+            --gold: #d97706;
+            --gold-light: #fbbf24;
+            --splash-ms: 1600ms;
         }
-        .portal-card {
-            background-color: #ffffff;
-            border: 2px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 2rem 1.5rem;
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
             text-align: center;
+            color: #ffffff;
+            background: linear-gradient(165deg, var(--navy) 0%, var(--navy-mid) 58%, var(--navy-light) 100%);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .splash {
+            width: 100%;
+            max-width: 360px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-between;
-            box-shadow: var(--shadow-sm);
-            transition: transform 0.15s ease, border-color 0.15s ease;
         }
-        .portal-card:hover {
-            border-color: var(--primary-blue);
-            transform: translateY(-3px);
+
+        .splash-badge {
+            font-size: 0.66rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #fde68a;
+            background: rgba(217, 119, 6, 0.18);
+            border: 1px solid rgba(217, 119, 6, 0.55);
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            margin-bottom: 1.6rem;
         }
-        .portal-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            color: var(--primary-navy);
+
+        /* --- Logo + Cincin Putar --- */
+        .logo-wrap {
+            position: relative;
+            width: 104px;
+            height: 104px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.35rem;
+            animation: splashPop 0.45s ease-out both;
         }
-        .portal-title {
-            font-size: 1.3rem;
+
+        .logo-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-top-color: var(--gold-light);
+            border-right-color: var(--gold-light);
+            animation: splashSpin 0.95s linear infinite;
+        }
+
+        .logo-core {
+            width: 76px;
+            height: 76px;
+            border-radius: 20px;
+            background: #ffffff;
+            color: var(--navy);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: 800;
-            color: var(--primary-navy);
-            margin-bottom: 0.5rem;
+            font-size: 1.85rem;
+            letter-spacing: -0.02em;
+            border: 2px solid var(--gold);
         }
-        .portal-desc {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            margin-bottom: 1.5rem;
-            line-height: 1.5;
-        }
-        .hero-banner {
-            background: linear-gradient(135deg, #0f2942 0%, #1e3a8a 100%);
-            color: #ffffff;
-            border-radius: var(--radius-md);
-            padding: 2.5rem 1.5rem;
-            text-align: center;
-            border-bottom: 4px solid var(--accent-gold);
-            box-shadow: var(--shadow-md);
-        }
-        .hero-title {
-            font-size: 1.8rem;
+
+        /* --- Teks Identitas --- */
+        .splash-title {
+            font-size: 1.35rem;
             font-weight: 800;
             letter-spacing: -0.01em;
-            margin-bottom: 0.5rem;
         }
-        .hero-sub {
-            font-size: 1.1rem;
+
+        .splash-sub {
+            margin-top: 0.3rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #c7d2e4;
+        }
+
+        /* --- Progress Bar --- */
+        .splash-bar {
+            position: relative;
+            width: 100%;
+            max-width: 250px;
+            height: 6px;
+            margin-top: 1.6rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.16);
+            overflow: hidden;
+        }
+
+        .splash-bar-fill {
+            display: block;
+            height: 100%;
+            width: 100%;
+            border-radius: 999px;
+            transform-origin: left center;
+            transform: scaleX(0);
+            background: linear-gradient(90deg, var(--gold), var(--gold-light));
+            animation: splashFill var(--splash-ms) cubic-bezier(0.35, 0, 0.25, 1) forwards;
+        }
+
+        .splash-status {
+            margin-top: 0.9rem;
+            font-size: 0.85rem;
             color: #cbd5e1;
-            margin-bottom: 1rem;
+            min-height: 1.25em;
+        }
+
+        /* --- Tombol Cadangan (muncul setelah beberapa saat) --- */
+        .splash-actions {
+            margin-top: 1.5rem;
+            width: 100%;
+            max-width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+        }
+
+        .splash-actions.is-ready {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .splash-btn {
+            display: block;
+            padding: 0.8rem 1rem;
+            border-radius: 10px;
+            background: #ffffff;
+            color: var(--navy);
+            font-size: 0.95rem;
+            font-weight: 800;
+            text-decoration: none;
+            border: 2px solid var(--gold-light);
+        }
+
+        .splash-btn:active { transform: scale(0.98); }
+
+        .splash-link {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            text-decoration: underline;
+        }
+
+        /* --- Keyframes --- */
+        @keyframes splashSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes splashPop {
+            from { opacity: 0; transform: scale(0.8); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes splashFill {
+            to { transform: scaleX(1); }
+        }
+
+        /* Hormati preferensi pengguna yang mematikan animasi */
+        @media (prefers-reduced-motion: reduce) {
+            .logo-ring { animation: none; }
+            .logo-wrap { animation: none; }
+            .splash-bar-fill { animation-duration: 600ms; }
         }
     </style>
+
+    <!-- Set durasi splash sedini mungkin agar progress bar sinkron dengan redirect -->
+    <script>
+        (function () {
+            var seen = false;
+            try { seen = sessionStorage.getItem('evoting_splash_seen') === '1'; } catch (e) { }
+            var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            // Kunjungan pertama dalam tab: 1.6s. Kunjungan berikutnya: 0.5s (hemat waktu di HP kentang).
+            var delay = seen ? 500 : (reduced ? 800 : 1600);
+
+            window.__splashDelay = delay;
+            document.documentElement.style.setProperty('--splash-ms', delay + 'ms');
+        })();
+    </script>
 </head>
 <body>
 
-    <!-- Header Identity -->
-    <header class="school-header">
-        <div class="header-container">
-            <div class="brand-wrapper">
-                <div class="brand-logo">CK</div>
-                <div class="brand-text-container">
-                    <span class="brand-title">OSIS Candra Kirana</span>
-                    <div class="brand-sub">
-                        <span class="brand-sub1">SPENASIX</span> • <span class="brand-sub2">Divisi 9</span>
-                    </div>
-                </div>
-            </div>
-            <div class="brand-badge">SISTEM E-VOTING RESMI</div>
-        </div>
-    </header>
+    <main class="splash" role="status" aria-live="polite">
+        <span class="splash-badge">Sistem E-Voting Resmi</span>
 
-    <!-- Main Content -->
-    <main class="main-container">
-        
-        <div class="hero-banner">
-            <h1 class="hero-title">Pemilihan Ketua OSIS Candra Kirana</h1>
-            <p class="hero-sub">SPENASIX • Divisi 9</p>
-            <p style="font-size: 0.95rem; max-width: 600px; margin: 0 auto; color: #e2e8f0;">
-                Selamat datang di portal e-voting resmi. Gunakan ID Card dengan QR Code atau mintalah bantuan panitia di Mode Bilik Voting.
-            </p>
+        <div class="logo-wrap">
+            <span class="logo-ring" aria-hidden="true"></span>
+            <span class="logo-core">CK</span>
         </div>
 
-        <div class="portal-grid">
-            
-            <!-- Voting Method A: QR / NIS -->
-            <div class="portal-card">
-                <div>
-                    <div class="portal-icon">📷</div>
-                    <h2 class="portal-title">Voting ID Card / QR</h2>
-                    <p class="portal-desc">
-                        Gunakan kamera HP atau masukkan NIS 4 digit yang tertera pada ID Card siswa untuk memilih kandidat secara langsung.
-                    </p>
-                </div>
-                <a href="vote.html" class="btn btn-primary btn-block btn-lg">Buka QR Voting</a>
-            </div>
+        <h1 class="splash-title">OSIS Candra Kirana</h1>
+        <p class="splash-sub">SPENASIX &bull; Divisi 9</p>
 
-            <!-- Voting Method B: Mode Bilik -->
-            <div class="portal-card">
-                <div>
-                    <div class="portal-icon">🖥️</div>
-                    <h2 class="portal-title">Mode Bilik Voting</h2>
-                    <p class="portal-desc">
-                        Buka terminal komputer bilik voting (BILIK-01, BILIK-02). Khusus untuk siswa yang ditugaskan oleh panitia.
-                    </p>
-                </div>
-                <a href="voting-room.html" class="btn btn-primary btn-block btn-lg">Buka Terminal Bilik</a>
-            </div>
-
-            <!-- Admin Portal -->
-            <div class="portal-card">
-                <div>
-                    <div class="portal-icon">🛡️</div>
-                    <h2 class="portal-title">Portal Panitia / Admin</h2>
-                    <p class="portal-desc">
-                        Dashboard manajemen pemilihan, aktivasi bilik, penugasan siswa, statistik realtime, dan kelola data.
-                    </p>
-                </div>
-                <a href="admin.html" class="btn btn-secondary btn-block btn-lg">Login Admin</a>
-            </div>
-
-            <!-- ID Card & QR Generator Tool -->
-            <div class="portal-card">
-                <div>
-                    <div class="portal-icon">🪪</div>
-                    <h2 class="portal-title">Cetak ID Card & QR</h2>
-                    <p class="portal-desc">
-                        Cetak ID Card resmi siswa SPENASIX Divisi 9 beserta QR Code NIS 4 digit siap pakai untuk hari pemilihan.
-                    </p>
-                </div>
-                <a href="id-cards.html" class="btn btn-secondary btn-block btn-lg">Cetak ID Card</a>
-            </div>
-
+        <div class="splash-bar" aria-hidden="true">
+            <span class="splash-bar-fill"></span>
         </div>
+        <p class="splash-status" id="splashStatus">Menyiapkan halaman voting&hellip;</p>
 
-        <!-- Rules & Privacy Guide Card -->
-        <div class="card" style="margin-top: 2rem;">
-            <div class="card-header">
-                <h3 class="card-title">Prinsip & Keamanan Pemilihan</h3>
-            </div>
-            <ul style="padding-left: 1.25rem; font-size: 0.95rem; color: var(--secondary-slate); line-height: 1.7;">
-                <li><strong>Maksimal 1 Suara:</strong> Setiap siswa hanya mempunyai 1 hak suara yang divalidasi secara ketat oleh sistem.</li>
-                <li><strong>Kerahasiaan Terjamin:</strong> Pilihan kandidat bersifat anonim. Panitia hanya dapat melihat status <em>Sudah Voting</em> tanpa mengetahui kandidat mana yang Anda pilih.</li>
-                <li><strong>Panitia Tidak Memilih:</strong> Panitia hanya bertugas menetapkan bilik. Siswa wajib memilih kandidatnya sendiri.</li>
-            </ul>
+        <div class="splash-actions" id="splashActions">
+            <a class="splash-btn" href="vote.html">Buka Voting ID Card Sekarang &rarr;</a>
+            <a class="splash-link" href="portal.html">Masuk Menu Bilik / Panitia</a>
         </div>
-
     </main>
 
-    <!-- Footer -->
-    <footer class="school-footer">
-        <p>&copy; 2026 OSIS Candra Kirana SPENASIX Divisi 9. Sistem E-Voting Resmi.</p>
-    </footer>
+    <script>
+        (function () {
+            var delay = window.__splashDelay || 1600;
+            var statusEl = document.getElementById('splashStatus');
+            var actionsEl = document.getElementById('splashActions');
+            var redirected = false;
 
-    <!-- Supabase & App JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/config.js"></script>
-    <script src="js/supabase-client.js"></script>
-    <script src="js/main.js"></script>
+            function goToVoting() {
+                if (redirected) return;
+                redirected = true;
+                try { sessionStorage.setItem('evoting_splash_seen', '1'); } catch (e) { }
+                window.location.replace('vote.html');
+            }
+
+            // Tahapan teks status agar pengguna tahu prosesnya tetap berjalan
+            var steps = [
+                { at: Math.round(delay * 0.45), text: 'Menyiapkan pemindai QR Code\u2026' },
+                { at: Math.round(delay * 0.78), text: 'Hampir siap\u2026' }
+            ];
+            steps.forEach(function (step) {
+                if (step.at > 0) {
+                    setTimeout(function () {
+                        if (!redirected && statusEl) statusEl.textContent = step.text;
+                    }, step.at);
+                }
+            });
+
+            // Tombol cadangan muncul bila pengguna ingin langsung melompat
+            setTimeout(function () {
+                if (actionsEl) actionsEl.classList.add('is-ready');
+            }, Math.max(900, Math.round(delay * 0.6)));
+
+            // Redirect utama + failsafe (bila timer ditunda oleh browser HP)
+            setTimeout(goToVoting, delay);
+            setTimeout(goToVoting, delay + 2500);
+        })();
+    </script>
+
 </body>
 </html>

@@ -3,7 +3,7 @@
 Sistem E-Voting resmi, ringan, modern, aman, dan *mobile-first* untuk Pemilihan OSIS **Candra Kirana SPENASIX Divisi 9** (kapasitas 500–1.000 siswa).
 
 Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, bebas dari elemen desain berlebihan (*no glow, no glassmorphic, no 3D, no heavy animation*), serta dilengkapi dengan **Dua Metode Akses Voting**:
-1. **Metode ID Card / QR Code:** Siswa melakukan scan QR NIS 4 digit pada ID Card fisik (kartu absen asli) menggunakan kamera HP yang **otomatis aktif secara default** di `vote.html`.
+1. **Metode ID Card / QR Code:** Siswa melakukan scan QR NIS 4 digit pada ID Card fisik (kartu absen asli) menggunakan kamera HP. Mengakses web (halaman awal `index.html`) akan **langsung menampilkan animasi loading singkat lalu otomatis membuka halaman voting** (`vote.html`) dengan **kamera otomatis aktif secara default**.
 2. **Mode Bilik Voting:** Panitia menetapkan siswa yang tidak membawa ID Card ke komputer bilik (`BILIK-01`, `BILIK-02`, dst.) yang menerima *assignment* secara *realtime* tanpa perlu input NIS/password di layar bilik.
 
 ---
@@ -23,7 +23,8 @@ Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, be
 
 ```text
 /
-├── index.html               # Halaman utama / Portal Pemilihan
+├── index.html               # Splash screen ringan + auto-redirect ke vote.html saat web dibuka
+├── portal.html              # Menu portal (Voting, Bilik, Admin, Cetak ID Card)
 ├── vote.html                # Halaman Voting QR Code (Kamera Aktif Default)
 ├── voting-room.html         # Terminal Komputer Bilik Voting
 ├── admin.html               # Portal Admin Panitia & Dashboard Realtime
@@ -57,6 +58,27 @@ Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, be
 ├── .gitignore
 └── README.md
 ```
+
+---
+
+## 🧭 Alur Navigasi Halaman
+
+```text
+Buka web (index.html)
+        │  splash loading ±1,6 detik (kunjungan ulang ±0,5 detik)
+        ▼
+   vote.html  ← halaman default: kamera QR langsung aktif
+        │
+        │  tombol "☰ Menu" / selesai voting
+        ▼
+   portal.html ← menu alternatif: Mode Bilik, Admin, Cetak ID Card
+```
+
+Catatan performa (dioptimalkan untuk perangkat kelas bawah / "HP kentang"):
+- Splash `index.html` dibuat murni CSS tanpa gambar & tanpa Supabase JS, serta `prefetch` ke `vote.html`, `css/style.css`, dan `css/vote.css` agar halaman voting terasa instan.
+- Semua animasi hanya memakai `transform`/`opacity` (ramah GPU), tanpa `blur`/`backdrop-filter`, dan otomatis nonaktif bila pengguna mengaktifkan **Reduce Motion** di sistemnya.
+- Scanner QR memakai mode `disableFlip` serta `BarcodeDetector` bawaan browser bila didukung (jauh lebih hemat CPU/baterai).
+- Foto kandidat dimuat `lazy` + `decoding="async"` sehingga halaman tidak berat saat dibuka.
 
 ---
 
@@ -114,6 +136,7 @@ cd evoting-spenasix-divisi9
 1. Masuk ke **SQL Editor** di Supabase Dashboard.
 2. Salin dan jalankan seluruh isi file `supabase/migrations/20261005_initial_schema.sql`.
 3. Skrip ini akan membuat tabel (`students`, `candidates`, `ballots`, `election_settings`, `voting_rooms`, `voting_sessions`, `audit_logs`), mengaktifkan RLS, serta memasang fungsi RPC atomik (`submit_vote_qr`, `submit_vote_room`, `activate_room`, `assign_student_to_room`, `get_admin_dashboard_stats`).
+4. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261006_room_vote_management.sql`.** File ini menambahkan RPC manajemen bilik: `deactivate_room` (Keluar Mode Bilik dari terminal), `delete_voting_room` (Hapus bilik dari daftar), dan `reset_votes_only` (Reset seluruh suara tanpa mematikan perangkat bilik).
 
 ### 4. Eksekusi Seed Data Awal
 1. Di SQL Editor Supabase, salin dan jalankan isi file `supabase/seed.sql`.
@@ -134,7 +157,7 @@ cd evoting-spenasix-divisi9
 3. Tekan **Set OPEN (Buka Voting)**. Sistem sekarang siap menerima suara.
 
 ### 2. Voting ID Card Fisik / QR Code (Metode A)
-1. Buka `vote.html` di perangkat pemilih.
+1. Pemilih cukup membuka alamat utama web (mis. `https://domain-sekolah/`). Halaman `index.html` menampilkan **animasi loading splash** lalu **otomatis berpindah ke `vote.html`** (kunjungan berikutnya di tab yang sama hanya butuh ±0,5 detik). Tombol "Buka Voting ID Card Sekarang" tersedia sebagai jalan pintas manual.
 2. **Kamera scanner otomatis aktif secara default.**
 3. Arahkan kamera ke QR Code ID Card fisik (kartu absen) siswa.
 4. Sistem membaca NIS 4-digit secara otomatis, menutup kamera, dan **langsung menampilkan 1 Halaman Surat Suara Kandidat**.
@@ -148,6 +171,7 @@ cd evoting-spenasix-divisi9
    - `BILIK-03` → PIN: `315807`
    - `BILIK-04` → PIN: `862451`
 3. Tekan **Aktifkan Bilik Ini**. Komputer bilik akan menampilkan status `BILIK-01 | SIAP | Menunggu penugasan siswa...`.
+4. Untuk **mengakhiri Mode Bilik** pada satu perangkat (mis. ganti komputer / komputer dipindah fungsi), tekan tombol **🔓 Keluar Mode Bilik** pada status bar terminal. Bilik akan dinonaktifkan (`OFFLINE`), token perangkat dihapus, dan perangkat wajib diaktivasi ulang memakai PIN.
 
 ### 4. Menugaskan Siswa Tanpa ID Card (Mode Bilik)
 1. Panitia di meja pendaftaran membuka `admin.html` tab **🖥️ Mode Bilik Voting**.

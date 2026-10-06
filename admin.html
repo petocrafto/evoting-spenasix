@@ -15,7 +15,7 @@
     <header class="school-header">
         <div class="header-container">
             <div class="brand-wrapper">
-                <a href="index.html" style="text-decoration:none;" class="brand-logo">CK</a>
+                <a href="portal.html" style="text-decoration:none;" class="brand-logo">CK</a>
                 <div class="brand-text-container">
                     <span class="brand-title">OSIS Candra Kirana</span>
                     <div class="brand-sub">
@@ -233,9 +233,19 @@
 
                 <!-- Student Master List Table -->
                 <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Daftar Seluruh Siswa</h3>
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                        <div>
+                            <h3 class="card-title">Daftar Siswa &amp; Pengecekan Per Kelas</h3>
+                            <p class="card-subtitle">Filter berdasarkan kelas untuk mengecek siapa yang sudah / belum memberikan suara.</p>
+                        </div>
+                        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <select id="studentListKelasFilter" class="form-control" style="min-width:160px;" onchange="refreshStudentListTable()">
+                                <option value="">-- Semua Kelas --</option>
+                            </select>
+                            <input type="text" id="studentListSearch" class="form-control" style="min-width:180px;" placeholder="Cari nama / NIS..." oninput="refreshStudentListTable()" />
+                        </div>
                     </div>
+                    <div id="studentListSummary" style="margin-bottom:0.75rem; font-size:0.9rem; font-weight:600; color:var(--secondary-slate);"></div>
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
@@ -294,8 +304,15 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Daftar Bilik Voting Terdaftar</h3>
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+                        <div>
+                            <h3 class="card-title">Daftar Bilik Voting Terdaftar</h3>
+                            <p class="card-subtitle">Daftar perangkat bilik komputer beserta status aktivasi saat ini.</p>
+                        </div>
+                        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="executeResetVotesOnly()">♻️ Reset Suara Saja</button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="executeResetAllRooms()">🔄 Reset Seluruh Perangkat Bilik (Force Offline)</button>
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table class="data-table">
@@ -331,6 +348,27 @@
                         <button type="button" class="btn btn-secondary" onclick="updateElectionStatus('DRAFT')">Set DRAFT (Voting Belum Dibuka)</button>
                         <button type="button" class="btn btn-success" onclick="updateElectionStatus('OPEN')">Set OPEN (Buka Voting)</button>
                         <button type="button" class="btn btn-danger" onclick="updateElectionStatus('CLOSED')">Set CLOSED (Tutup Voting)</button>
+                    </div>
+                </div>
+
+                <!-- Danger Zone: Total Election Reset for Election Day -->
+                <div class="card" style="border:2px solid var(--status-danger); background:#fff5f5;">
+                    <div class="card-header" style="border-bottom-color:#fecaca;">
+                        <h2 class="card-title" style="color:var(--status-danger);">🔴 Reset Total Pemilihan (Persiapan Hari-H)</h2>
+                    </div>
+                    <p style="font-size:0.9rem; color:#991b1b; line-height:1.6; margin-bottom:1.25rem;">
+                        Gunakan fitur ini sebelum hari pemilihan dimulai untuk:
+                        <br>• Menghapus seluruh data suara hasil pengujian (*test votes*).
+                        <br>• Mengembalikan status seluruh siswa menjadi <strong>BELUM VOTING</strong>.
+                        <br>• Menghapus seluruh sesi aktif dan mengosongkan status komputer bilik.
+                    </p>
+                    <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-danger btn-lg" onclick="executeTotalElectionReset()">
+                            🗑️ Reset Total Seluruh Suara &amp; Status Siswa (Mulai Ulang Pemilihan)
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-lg" onclick="executeResetVotesOnly()">
+                            ♻️ Reset Suara Saja (Data Siswa &amp; Bilik Tetap)
+                        </button>
                     </div>
                 </div>
             </div>

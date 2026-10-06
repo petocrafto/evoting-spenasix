@@ -2,12 +2,14 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0f2942">
     <title>Voting ID Card - OSIS Candra Kirana SPENASIX Divisi 9</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/vote.css">
-    <!-- HTML5 QR Code Camera Scanner Library -->
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- Percepat koneksi ke CDN library scanner -->
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 </head>
 <body>
 
@@ -15,7 +17,7 @@
     <header class="school-header">
         <div class="header-container">
             <div class="brand-wrapper">
-                <a href="index.html" style="text-decoration:none;" class="brand-logo">CK</a>
+                <a href="portal.html" style="text-decoration:none;" class="brand-logo">CK</a>
                 <div class="brand-text-container">
                     <span class="brand-title">OSIS Candra Kirana</span>
                     <div class="brand-sub">
@@ -23,7 +25,7 @@
                     </div>
                 </div>
             </div>
-            <a href="index.html" class="btn btn-secondary btn-sm" style="color:#ffffff; background:rgba(255,255,255,0.15); border-color:transparent;">← Kembali</a>
+            <a href="portal.html" class="btn btn-secondary btn-sm header-ghost-btn">☰ Menu</a>
         </div>
     </header>
 
@@ -31,27 +33,51 @@
     <main class="main-container">
         <div class="vote-wrapper">
 
+            <!-- Indikator Tahapan Voting -->
+            <ol class="vote-steps" id="voteSteps" aria-label="Tahapan voting">
+                <li class="vote-step is-active" id="voteStep1">
+                    <span class="vote-step-dot">1</span>
+                    <span class="vote-step-label">Verifikasi</span>
+                </li>
+                <li class="vote-step" id="voteStep2">
+                    <span class="vote-step-dot">2</span>
+                    <span class="vote-step-label">Pilih Kandidat</span>
+                </li>
+                <li class="vote-step" id="voteStep3">
+                    <span class="vote-step-dot">3</span>
+                    <span class="vote-step-label">Selesai</span>
+                </li>
+            </ol>
+
             <!-- STEP 1: NIS INPUT / QR SCAN VERIFICATION -->
             <div id="stepNisInput" class="card nis-card">
                 <h2 class="card-title">Verifikasi ID Card / NIS</h2>
-                <p class="card-subtitle">Scan QR Code ID Card fisik siswa atau ketik 4 digit NIS di bawah ini.</p>
+                <p class="card-subtitle">Scan QR Code ID Card siswa, atau ketik 4 digit NIS di bawah ini.</p>
 
-                <!-- Camera QR Scanner Container (Active by Default) -->
-                <div style="margin-bottom:1.25rem;">
-                    <div id="qrCameraScannerContainer" style="display:block; margin-bottom:1rem; border:2px dashed var(--primary-blue); border-radius:var(--radius-md); padding:0.5rem; background:#f0f9ff;">
-                        <div id="reader" style="width:100%;"></div>
-                        <p style="font-size:0.85rem; color:var(--primary-navy); font-weight:600; margin-top:0.5rem;">📷 Kamera Aktif: Arahkan ke QR Code ID Card Absen Siswa</p>
+                <!-- Scanner QR Kamera (aktif secara default) -->
+                <div class="scanner-box" id="qrCameraScannerContainer">
+                    <div class="scanner-frame">
+                        <div id="reader" class="scanner-reader"></div>
+                        <span class="scanner-corner is-tl" aria-hidden="true"></span>
+                        <span class="scanner-corner is-tr" aria-hidden="true"></span>
+                        <span class="scanner-corner is-bl" aria-hidden="true"></span>
+                        <span class="scanner-corner is-br" aria-hidden="true"></span>
+                        <span class="scanline" aria-hidden="true"></span>
                     </div>
-                    <button type="button" id="btnToggleCameraScanner" class="btn btn-secondary btn-block btn-sm" onclick="toggleCameraScanner()">
-                        🔄 Matikan / Nyalakan Ulang Kamera
-                    </button>
+                    <p class="scanner-hint" id="scannerHint">📷 Arahkan kamera ke QR Code pada ID Card siswa</p>
                 </div>
 
-                <form onsubmit="submitNisForm(event)">
-                    <label class="form-label" style="text-align:center;">Atau Masukkan NIS (4 Digit):</label>
-                    <input type="text" id="nisInput" class="nis-input-large" placeholder="1234" maxlength="4" pattern="\d{4}" inputmode="numeric" autocomplete="off" autofocus required />
+                <button type="button" id="btnToggleCameraScanner" class="btn btn-secondary btn-block btn-sm" onclick="toggleCameraScanner()">
+                    🔄 Matikan / Nyalakan Ulang Kamera
+                </button>
+
+                <div class="vote-divider"><span>atau ketik manual</span></div>
+
+                <form class="nis-form" onsubmit="submitNisForm(event)" autocomplete="off">
+                    <label class="form-label" for="nisInput">Masukkan NIS 4 Digit</label>
+                    <input type="text" id="nisInput" class="nis-input-large" placeholder="••••" maxlength="4" pattern="\d{4}" inputmode="numeric" autocomplete="off" aria-label="NIS 4 digit" required />
                     
-                    <div id="nisErrorMessage" style="color:var(--status-danger); font-size:0.9rem; font-weight:600; margin-bottom:1rem; display:none;"></div>
+                    <div id="nisErrorMessage" class="nis-error-message"></div>
 
                     <button type="submit" id="btnVerifyNis" class="btn btn-primary btn-block btn-lg">
                         Lanjutkan Voting →
@@ -60,7 +86,7 @@
             </div>
 
             <!-- STEP 2: CANDIDATE SELECTION -->
-            <div id="stepCandidateSelect" style="display:none;">
+            <div id="stepCandidateSelect" class="step-panel" style="display:none;">
                 
                 <!-- Student Verified Info Banner -->
                 <div class="student-info-bar">
@@ -74,9 +100,9 @@
                     </div>
                 </div>
 
-                <div class="card-header" style="background:#ffffff; padding:1rem; border-radius:var(--radius-md); margin-bottom:1.5rem;">
-                    <h2 class="card-title" style="margin:0;">Silakan Pilih Kandidat Ketua OSIS</h2>
-                    <p class="card-subtitle" style="margin:0.25rem 0 0 0;">Tekan tombol di bawah foto kandidat yang Anda pilih.</p>
+                <div class="candidate-header">
+                    <h2 class="candidate-header-title">Pilih Kandidat Ketua OSIS</h2>
+                    <p class="candidate-header-sub">Tekan tombol <strong>Pilih Kandidat</strong> di bawah foto pilihan Anda, lalu konfirmasi suara.</p>
                 </div>
 
                 <!-- Candidate Grid -->
@@ -86,15 +112,16 @@
             </div>
 
             <!-- STEP 3: SUCCESS SCREEN -->
-            <div id="stepSuccess" class="card vote-success-card" style="display:none;">
+            <div id="stepSuccess" class="card vote-success-card step-panel" style="display:none;">
                 <div class="success-icon">✅</div>
                 <h2 class="success-title">SUARA BERHASIL TERCATAT</h2>
                 <p class="success-message">
                     Terima kasih telah berpartisipasi dalam Pemilihan OSIS Candra Kirana SPENASIX Divisi 9.<br><br>
                     Suara Anda telah tersimpan secara aman dan anonim. Silakan tinggalkan bilik voting.
                 </p>
-                <div style="margin-top:2rem;">
-                    <a href="index.html" class="btn btn-primary btn-lg">Kembali ke Halaman Utama</a>
+                <p class="success-note">🔒 Kerahasiaan pilihan Anda dijamin oleh sistem.</p>
+                <div class="success-actions">
+                    <a href="portal.html" class="btn btn-primary btn-lg">Selesai &amp; Kembali ke Menu</a>
                 </div>
             </div>
 
@@ -128,6 +155,8 @@
     </footer>
 
     <!-- JS Scripts -->
+    <!-- Library scanner kamera dimuat lebih dulu agar objek Html5Qrcode siap saat halaman aktif -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config.js"></script>
     <script src="js/supabase-client.js"></script>

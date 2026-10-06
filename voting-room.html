@@ -14,7 +14,7 @@
     <header class="school-header">
         <div class="header-container">
             <div class="brand-wrapper">
-                <a href="index.html" style="text-decoration:none;" class="brand-logo">CK</a>
+                <a href="portal.html" style="text-decoration:none;" class="brand-logo">CK</a>
                 <div class="brand-text-container">
                     <span class="brand-title">OSIS Candra Kirana</span>
                     <div class="brand-sub">
@@ -57,11 +57,16 @@
 
                 <!-- Room Identity Status Bar -->
                 <div class="room-status-bar">
-                    <div class="room-id-badge" id="displayRoomCode">BILIK-01</div>
-                    <div class="room-indicator">
-                        <div id="roomIndicatorDot" class="indicator-dot ready"></div>
-                        <span id="displayRoomStatusText">SIAP</span>
+                    <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                        <div class="room-id-badge" id="displayRoomCode">BILIK-01</div>
+                        <div class="room-indicator">
+                            <div id="roomIndicatorDot" class="indicator-dot ready"></div>
+                            <span id="displayRoomStatusText">SIAP</span>
+                        </div>
                     </div>
+                    <button type="button" id="btnExitRoomMode" class="btn btn-sm btn-danger" onclick="exitRoomMode()" title="Nonaktifkan perangkat ini dari Mode Bilik">
+                        🔓 Keluar Mode Bilik
+                    </button>
                 </div>
 
                 <!-- STATE A: STANDBY SCREEN (Waiting for Admin assignment) -->
