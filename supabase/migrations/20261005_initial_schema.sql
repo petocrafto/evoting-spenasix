@@ -668,3 +668,74 @@ BEGIN
     );
 END;
 $$;
+
+-- I. Reset All Rooms Credentials & Sessions (Force All Rooms OFFLINE)
+CREATE OR REPLACE FUNCTION public.reset_all_rooms()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- Cancel all active voting sessions
+    UPDATE public.voting_sessions
+    SET status = 'CANCELLED', updated_at = NOW()
+    WHERE status = 'ACTIVE';
+
+    -- Reset all students currently IN_PROGRESS back to NOT_VOTED (if not voted)
+    UPDATE public.students
+    SET voting_status = 'NOT_VOTED', updated_at = NOW()
+    WHERE has_voted = FALSE AND voting_status = 'IN_PROGRESS';
+
+    -- Reset all voting rooms to OFFLINE and revoke device tokens
+    UPDATE public.voting_rooms
+    SET status = 'OFFLINE',
+        device_token = NULL,
+        current_session_id = NULL,
+        updated_at = NOW();
+
+    -- Audit log
+    INSERT INTO public.audit_logs (actor_type, action, details)
+    VALUES ('ADMIN', 'RESET_ALL_ROOMS', jsonb_build_object('message', 'Seluruh token bilik di-reset dan status diubah ke OFFLINE.'));
+
+    RETURN jsonb_build_object('success', true, 'message', 'Seluruh komputer bilik telah di-reset ke status OFFLINE.');
+END;
+$$;
+
+-- J. Total Election Reset for Election Day (Clear Ballots, Reset All Students to NOT_VOTED)
+CREATE OR REPLACE FUNCTION public.reset_total_election()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- 1. Truncate/Clear Ballots
+    DELETE FROM public.ballots;
+
+    -- 2. Clear Voting Sessions
+    DELETE FROM public.voting_sessions;
+
+    -- 3. Reset All Students status to NOT_VOTED
+    UPDATE public.students
+    SET has_voted = FALSE,
+        voting_status = 'NOT_VOTED',
+        voted_at = NULL,
+        updated_at = NOW();
+
+    -- 4. Reset All Rooms to OFFLINE
+    UPDATE public.voting_rooms
+    SET status = 'OFFLINE',
+        device_token = NULL,
+        current_session_id = NULL,
+        updated_at = NOW();
+
+    -- 5. Set Election Status to DRAFT
+    UPDATE public.election_settings
+    SET status = 'DRAFT', updated_at = NOW();
+
+    -- 6. Audit log
+    INSERT INTO public.audit_logs (actor_type, action, details)
+    VALUES ('ADMIN', 'TOTAL_ELECTION_RESET', jsonb_build_object('message', 'Seluruh data suara dan status voting siswa telah di-reset untuk hari-H.'));
+
+    RETURN jsonb_build_object('success', true, 'message', 'Seluruh suara dan status voting siswa berhasil di-reset total!');
+END;
+$$;
