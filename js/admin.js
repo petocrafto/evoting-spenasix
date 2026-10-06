@@ -86,9 +86,18 @@ async function handleAdminLogin(event) {
 }
 
 async function handleAdminLogout() {
+    if (!confirm('Keluar dari akun ini?\n\nAnda harus login kembali untuk mengakses dashboard panitia.')) {
+        return;
+    }
+
     const client = getSupabaseClient();
     await client.auth.signOut();
-    showToast('Berhasil logout.', 'info');
+
+    // Clear any residual login form input so the next account is entered cleanly
+    const pwField = document.getElementById('loginPassword');
+    if (pwField) pwField.value = '';
+
+    showToast('Berhasil logout. Silakan login kembali dengan akun yang benar.', 'info');
 }
 
 /* Tab Navigation */
@@ -393,38 +402,96 @@ async function executeStudentAssignment() {
    3. KELOLA SISWA & EXCEL/CSV IMPORTER
    ========================================== */
 async function loadStudentsTab() {
+    await populateStudentClassFilter();
     await refreshStudentListTable();
+}
+
+async function populateStudentClassFilter() {
+    const client = getSupabaseClient();
+    const { data: students } = await client.from('students').select('kelas');
+
+    const select = document.getElementById('studentListKelasFilter');
+    if (!select) return;
+
+    const previous = select.value;
+    const uniqueClasses = students ? [...new Set(students.map(s => s.kelas))].sort() : [];
+
+    select.innerHTML = '<option value="">-- Semua Kelas --</option>';
+    uniqueClasses.forEach(k => {
+        select.innerHTML += `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`;
+    });
+
+    if (previous) select.value = previous;
+}
+
+function updateStudentListSummary(total, voted, notVoted, kelasFilter) {
+    const summaryEl = document.getElementById('studentListSummary');
+    if (!summaryEl) return;
+
+    if (total === 0) {
+        summaryEl.textContent = kelasFilter
+            ? `Tidak ada siswa pada kelas ${kelasFilter}.`
+            : 'Belum ada data siswa terdaftar.';
+        return;
+    }
+
+    const scope = kelasFilter ? `Kelas ${kelasFilter}` : 'Semua Kelas';
+    summaryEl.textContent = `${scope} — Total: ${total} siswa • Sudah Voting: ${voted} • Belum Voting: ${notVoted}`;
 }
 
 async function refreshStudentListTable() {
     const client = getSupabaseClient();
-    const { data: students, error } = await client
+
+    const filterEl = document.getElementById('studentListKelasFilter');
+    const searchEl = document.getElementById('studentListSearch');
+    const kelasFilter = filterEl ? filterEl.value : '';
+    const searchFilter = searchEl ? searchEl.value.trim() : '';
+
+    let query = client
         .from('students')
         .select('*')
         .order('kelas', { ascending: true })
         .order('nama', { ascending: true });
 
+    if (kelasFilter) query = query.eq('kelas', kelasFilter);
+    if (searchFilter) query = query.or(`nama.ilike.%${searchFilter}%,nis.ilike.%${searchFilter}%`);
+
+    const { data: students, error } = await query;
+
     const tbody = document.getElementById('studentsListTbody');
     tbody.innerHTML = '';
 
-    if (!students || students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada data siswa terdaftar.</td></tr>';
+    if (error) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Gagal memuat data siswa.</td></tr>';
         return;
     }
 
+    if (!students || students.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada data siswa terdaftar.</td></tr>';
+        updateStudentListSummary(0, 0, 0, kelasFilter);
+        return;
+    }
+
+    let votedCount = 0;
+
     students.forEach(s => {
+        const isVoted = s.has_voted || s.voting_status === 'VOTED';
+        if (isVoted) votedCount++;
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><strong>${escapeHtml(s.nis)}</strong></td>
             <td>${escapeHtml(s.nama)}</td>
             <td>${escapeHtml(s.kelas)}</td>
-            <td><span class="badge badge-${s.voting_status === 'VOTED' ? 'voted' : 'not-voted'}">${s.voting_status}</span></td>
+            <td><span class="badge badge-${isVoted ? 'voted' : 'not-voted'}">${s.voting_status}</span></td>
             <td>
                 <button type="button" class="btn btn-sm btn-secondary" onclick="deleteStudent('${s.id}', '${escapeHtml(s.nama)}')">Hapus</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
+
+    updateStudentListSummary(students.length, votedCount, students.length - votedCount, kelasFilter);
 }
 
 function handleExcelFileSelect(event) {
@@ -814,7 +881,10 @@ async function loadRoomsTab() {
             <td>${r.device_token ? 'TERAKTIVASI' : 'BELUM AKTIF'}</td>
             <td>${formatDate(r.updated_at)}</td>
             <td>
-                <button type="button" class="btn btn-sm btn-secondary" onclick="resetBilikRoom('${r.room_code}')">Reset Bilik</button>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="resetBilikRoom('${r.room_code}')">Reset Bilik</button>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteVotingRoom('${r.room_code}')">Hapus Bilik</button>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
@@ -882,6 +952,46 @@ async function resetBilikRoom(roomCode) {
     }
 }
 
+async function deleteVotingRoom(roomCode) {
+    if (!confirm(`Hapus bilik ${roomCode} secara PERMANEN?\n\nBilik akan dihapus dari daftar. Perangkat yang masih teraktivasi harus diaktifkan ulang dengan bilik lain.`)) {
+        return;
+    }
+
+    try {
+        const res = await callRpc('delete_voting_room', { p_room_code: roomCode });
+        if (res && res.success) {
+            showToast(res.message, 'success');
+            loadRoomsTab();
+            loadDashboardStats();
+        } else {
+            showToast((res && res.message) || 'Gagal menghapus bilik.', 'error');
+        }
+    } catch (err) {
+        console.error('Delete room error:', err);
+        showToast('Terjadi kesalahan saat menghapus bilik.', 'error');
+    }
+}
+
+async function executeResetAllRooms() {
+    if (!confirm('Reset SELURUH perangkat bilik?\n\nSemua bilik akan kembali ke status OFFLINE dan wajib aktivasi ulang menggunakan PIN.')) {
+        return;
+    }
+
+    try {
+        const res = await callRpc('reset_all_rooms');
+        if (res && res.success) {
+            showToast(res.message, 'success');
+            loadRoomsTab();
+            loadDashboardStats();
+        } else {
+            showToast((res && res.message) || 'Gagal mereset seluruh bilik.', 'error');
+        }
+    } catch (err) {
+        console.error('Reset all rooms error:', err);
+        showToast('Terjadi kesalahan saat mereset seluruh bilik.', 'error');
+    }
+}
+
 /* ==========================================
    6. ELECTION SETTINGS
    ========================================== */
@@ -910,6 +1020,52 @@ async function updateElectionStatus(newStatus) {
         showToast(`Status election berhasil diubah menjadi ${newStatus}.`, 'success');
         loadElectionTab();
         loadDashboardStats();
+    }
+}
+
+async function executeResetVotesOnly() {
+    if (!confirm('Reset SELURUH suara?\n\nSemua ballot & status voting siswa akan dikosongkan. Data siswa dan perangkat bilik tetap ada (bilik tidak perlu aktivasi ulang).')) {
+        return;
+    }
+
+    try {
+        const res = await callRpc('reset_votes_only');
+        if (res && res.success) {
+            showToast(res.message, 'success');
+            loadDashboardStats();
+            if (activeTab === 'students') refreshStudentListTable();
+            if (activeTab === 'rooms') loadRoomsTab();
+        } else {
+            showToast((res && res.message) || 'Gagal mereset suara.', 'error');
+        }
+    } catch (err) {
+        console.error('Reset votes only error:', err);
+        showToast('Terjadi kesalahan saat mereset suara.', 'error');
+    }
+}
+
+async function executeTotalElectionReset() {
+    if (!confirm('⚠️ RESET TOTAL PEMILIHAN\n\nSeluruh suara, sesi, dan status voting siswa akan dihapus, serta semua bilik dikembalikan ke OFFLINE. Lanjutkan?')) {
+        return;
+    }
+    if (!confirm('Konfirmasi terakhir: tindakan ini TIDAK dapat dibatalkan. Yakin ingin reset total?')) {
+        return;
+    }
+
+    try {
+        const res = await callRpc('reset_total_election');
+        if (res && res.success) {
+            showToast(res.message, 'success');
+            loadElectionTab();
+            loadDashboardStats();
+            if (activeTab === 'rooms') loadRoomsTab();
+            if (activeTab === 'students') refreshStudentListTable();
+        } else {
+            showToast((res && res.message) || 'Gagal melakukan reset total.', 'error');
+        }
+    } catch (err) {
+        console.error('Total election reset error:', err);
+        showToast('Terjadi kesalahan saat melakukan reset total.', 'error');
     }
 }
 

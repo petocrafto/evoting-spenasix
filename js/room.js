@@ -90,6 +90,7 @@ async function verifyAndSetupRoom() {
 
     if (error || !room) {
         console.warn('Room device token invalid or revoked.');
+        teardownRoomRealtime();
         clearRoomCredentials();
         showActivationScreen();
         showToast('Kredensial bilik tidak valid atau telah di-reset.', 'error');
@@ -117,6 +118,63 @@ function clearRoomCredentials() {
     roomCode = null;
     deviceToken = null;
 }
+
+/**
+ * Stop the realtime subscription and clear the in-memory session state.
+ * Used both when leaving Mode Bilik and when the credential is revoked.
+ */
+function teardownRoomRealtime() {
+    if (sessionTimerInterval) {
+        clearInterval(sessionTimerInterval);
+        sessionTimerInterval = null;
+    }
+
+    if (realtimeChannel) {
+        const client = getSupabaseClient();
+        if (client) client.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+    }
+
+    activeSession = null;
+    activeStudent = null;
+    roomSelectedCandidateId = null;
+    isRoomSubmitting = false;
+}
+
+/**
+ * "Keluar Mode Bilik" action.
+ * Revokes the device token on the backend (room -> OFFLINE), clears local
+ * credentials and returns the terminal to the activation screen.
+ */
+async function exitRoomMode() {
+    const label = roomCode ? ` (${roomCode})` : '';
+    if (!confirm(`Keluar dari Mode Bilik${label} pada perangkat ini?\n\nBilik akan diubah ke status OFFLINE dan harus diaktivasi ulang menggunakan PIN.`)) {
+        return;
+    }
+
+    const btn = document.getElementById('btnExitRoomMode');
+    if (btn) btn.disabled = true;
+
+    try {
+        if (deviceToken) {
+            const response = await callRpc('deactivate_room', { p_device_token: deviceToken });
+            if (response && response.success) {
+                showToast(response.message || 'Mode bilik berhasil dikeluarkan.', 'info');
+            } else {
+                showToast((response && response.message) || 'Perangkat tidak dikenali, kredensial lokal tetap dihapus.', 'warning');
+            }
+        }
+    } catch (err) {
+        console.error('Exit room mode error:', err);
+        showToast('Terjadi kesalahan, namun kredensial lokal tetap dihapus.', 'warning');
+    } finally {
+        teardownRoomRealtime();
+        clearRoomCredentials();
+        if (btn) btn.disabled = false;
+        showActivationScreen();
+    }
+}
+
 
 function resetRoomStateToStandby() {
     if (sessionTimerInterval) clearInterval(sessionTimerInterval);

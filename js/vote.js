@@ -14,7 +14,32 @@ document.addEventListener('DOMContentLoaded', () => {
     initVotePage();
 });
 
+/**
+ * Sinkronkan indikator tahapan voting (1 Verifikasi -> 2 Pilih Kandidat -> 3 Selesai)
+ * @param {number} activeStep Langkah yang sedang aktif (1-3)
+ */
+function updateVoteStep(activeStep) {
+    for (let step = 1; step <= 3; step++) {
+        const el = document.getElementById('voteStep' + step);
+        if (!el) continue;
+        el.classList.toggle('is-active', step === activeStep);
+        el.classList.toggle('is-done', step < activeStep);
+    }
+}
+
+/**
+ * Perbarui teks petunjuk di bawah area kamera scanner.
+ */
+function setScannerHint(message, isError = false) {
+    const hint = document.getElementById('scannerHint');
+    if (!hint) return;
+    hint.textContent = message;
+    hint.classList.toggle('is-error', !!isError);
+}
+
 async function initVotePage() {
+    updateVoteStep(1);
+
     const urlParams = new URLSearchParams(window.location.search);
     const nisParam = urlParams.get('nis');
 
@@ -49,7 +74,14 @@ function startQrScanner() {
 
     html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
+        {
+            fps: 10,
+            qrbox: { width: 220, height: 220 },
+            // Cermin gambar dimatikan: hemat beban CPU pada HP kelas bawah
+            disableFlip: true,
+            // Gunakan BarcodeDetector bawaan browser bila tersedia (jauh lebih hemat daya)
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+        },
         async (decodedText) => {
             // Extracted raw QR code text or URL
             console.log('Scanned QR:', decodedText);
@@ -76,8 +108,11 @@ function startQrScanner() {
         (errorMessage) => {
             // Silent scanning attempts
         }
-    ).catch(err => {
+    ).then(() => {
+        setScannerHint('📷 Arahkan kamera ke QR Code pada ID Card siswa', false);
+    }).catch(err => {
         console.error('Camera access error:', err);
+        setScannerHint('⚠️ Kamera tidak dapat diakses. Silakan gunakan input NIS manual di bawah.', true);
         showToast('Gagal mengakses kamera. Izinkan akses kamera pada browser Anda.', 'error');
     });
 }
@@ -92,7 +127,9 @@ function showNisInputStep() {
     document.getElementById('stepNisInput').style.display = 'block';
     document.getElementById('stepCandidateSelect').style.display = 'none';
     document.getElementById('stepSuccess').style.display = 'none';
-    
+
+    updateVoteStep(1);
+
     // Auto start camera scanner by default
     setTimeout(() => {
         startQrScanner();
@@ -177,6 +214,8 @@ async function handleVerifyNis(nis) {
         document.getElementById('stepNisInput').style.display = 'none';
         document.getElementById('stepCandidateSelect').style.display = 'block';
 
+        updateVoteStep(2);
+
     } catch (err) {
         console.error('Error verifying NIS:', err);
         showToast('Terjadi kesalahan saat memverifikasi NIS.', 'error');
@@ -231,7 +270,7 @@ function renderCandidatesGrid(candidates) {
         card.innerHTML = `
             <div class="candidate-num-badge">${c.nomor_urut}</div>
             <div class="candidate-img-container">
-                <img src="${escapeHtml(foto)}" alt="${escapeHtml(c.nama)}" class="candidate-img" />
+                <img src="${escapeHtml(foto)}" alt="${escapeHtml(c.nama)}" class="candidate-img" loading="lazy" decoding="async" />
             </div>
             <div class="candidate-body">
                 <h3 class="candidate-name">${escapeHtml(c.nama)}</h3>
@@ -298,6 +337,8 @@ async function confirmVoteSubmission() {
 
             document.getElementById('stepCandidateSelect').style.display = 'none';
             document.getElementById('stepSuccess').style.display = 'block';
+
+            updateVoteStep(3);
         } else {
             showToast(response.message || 'Gagal menyimpan suara.', 'error');
             closeConfirmationModal();
