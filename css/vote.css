@@ -1,6 +1,11 @@
 /*
   Voting Page CSS
   OSIS Candra Kirana SPENASIX Divisi 9
+
+  Catatan performa (ramah HP kelas bawah):
+  - Hanya menganimasikan transform & opacity (GPU friendly).
+  - Tanpa backdrop-filter / blur / gambar latar berat.
+  - Semua animasi dinonaktifkan saat pengguna memilih "Reduce Motion".
 */
 
 .vote-wrapper {
@@ -8,33 +13,248 @@
   margin: 0 auto;
 }
 
-/* NIS Input Step */
+/* ================= Indikator Tahapan Voting ================= */
+.vote-steps {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0 0 1.25rem 0;
+  padding: 0.7rem 0.5rem;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.vote-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.vote-step + .vote-step::before {
+  content: "";
+  flex: 0 0 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border-color);
+}
+
+.vote-step-dot {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  background: #e2e8f0;
+  color: #64748b;
+  transition: background-color 0.25s ease, color 0.25s ease, transform 0.25s ease;
+}
+
+.vote-step-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vote-step.is-active .vote-step-dot {
+  background: var(--primary-blue);
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.vote-step.is-active .vote-step-label {
+  color: var(--primary-navy);
+}
+
+.vote-step.is-done .vote-step-dot {
+  background: var(--status-success);
+  color: #ffffff;
+}
+
+.vote-step.is-done .vote-step-label {
+  color: #15803d;
+}
+
+/* ================= Animasi Masuk Tiap Tahapan ================= */
+.step-panel,
+.nis-card {
+  animation: votePanelIn 0.28s ease-out both;
+}
+
+@keyframes votePanelIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ================= Kartu Verifikasi (Step 1) ================= */
 .nis-card {
   text-align: center;
   max-width: 480px;
-  margin: 2rem auto;
+  margin: 0 auto 1.5rem auto;
+  padding: 1.5rem 1.25rem;
+  border-top: 4px solid var(--primary-blue);
+  border-radius: var(--radius-lg);
+}
+
+/* --- Kotak Scanner QR --- */
+.scanner-box {
+  margin: 1.25rem 0;
+  padding: 0.6rem;
+  border-radius: var(--radius-md);
+  background: #f1f5f9;
+  border: 1px solid var(--border-color);
+}
+
+.scanner-frame {
+  position: relative;
+  overflow: hidden;
+  min-height: 200px;
+  border-radius: var(--radius-md);
+  background: #0f172a;
+}
+
+.scanner-reader {
+  width: 100%;
+}
+
+.scanner-reader video {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.scanner-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--accent-gold);
+  pointer-events: none;
+}
+
+.scanner-corner.is-tl { top: 8px; left: 8px; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
+.scanner-corner.is-tr { top: 8px; right: 8px; border-left: 0; border-bottom: 0; border-top-right-radius: 8px; }
+.scanner-corner.is-bl { bottom: 8px; left: 8px; border-right: 0; border-top: 0; border-bottom-left-radius: 8px; }
+.scanner-corner.is-br { bottom: 8px; right: 8px; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
+
+.scanline {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 12px;
+  height: 2px;
+  border-radius: 2px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(217, 119, 6, 0) 0%, #fbbf24 50%, rgba(217, 119, 6, 0) 100%);
+  animation: scanSweep 2.4s ease-in-out infinite;
+}
+
+@keyframes scanSweep {
+  0%   { transform: translateY(0); opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateY(180px); opacity: 0; }
+}
+
+.scanner-hint {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary-navy);
+  text-align: center;
+}
+
+.scanner-hint.is-error {
+  color: var(--status-danger);
+}
+
+/* ================= Divider & Form NIS ================= */
+.vote-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 1rem 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.vote-divider::before,
+.vote-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.nis-form .form-label {
+  display: block;
+  text-align: center;
 }
 
 .nis-input-large {
-  font-size: 2rem;
-  letter-spacing: 0.25em;
-  text-align: center;
-  font-weight: 800;
-  color: var(--primary-navy);
-  padding: 0.75rem;
-  border: 2px solid var(--primary-blue);
-  border-radius: var(--radius-md);
+  display: block;
   width: 100%;
-  max-width: 280px;
-  margin: 1rem auto;
+  max-width: 240px;
+  margin: 0.25rem auto 1rem auto;
+  padding: 0.6rem 0.75rem;
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+  text-align: center;
+  color: var(--primary-navy);
+  background: #ffffff;
+  border: 2px solid var(--border-color-dark);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s ease;
 }
 
+.nis-input-large::placeholder {
+  color: #cbd5e1;
+  letter-spacing: 0.2em;
+}
+
+.nis-input-large:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+}
+
+.nis-error-message {
+  display: none;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--status-danger);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+}
+
+/* ================= Info Siswa Terverifikasi (Step 2) ================= */
 .student-info-bar {
   background-color: #eff6ff;
   border: 1px solid #bfdbfe;
+  border-left: 5px solid var(--primary-blue);
   border-radius: var(--radius-md);
   padding: 1rem 1.25rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -43,6 +263,7 @@
 }
 
 .student-name-text {
+  display: block;
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--primary-navy);
@@ -57,24 +278,46 @@
   border-radius: 4px;
 }
 
-/* Candidate Grid */
+.candidate-header {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-left: 5px solid var(--accent-gold);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.candidate-header-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--primary-navy);
+}
+
+.candidate-header-sub {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ================= Grid & Kartu Kandidat ================= */
 .candidate-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
-  margin-top: 1rem;
+  gap: 1rem;
+  margin-top: 0.5rem;
 }
 
 .candidate-card {
-  background: #ffffff;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+  position: relative;
   display: flex;
   flex-direction: column;
+  background: #ffffff;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
   box-shadow: var(--shadow-sm);
   transition: transform 0.15s ease, border-color 0.15s ease;
-  position: relative;
 }
 
 .candidate-card:hover {
@@ -84,35 +327,48 @@
 
 .candidate-card.selected {
   border-color: var(--primary-blue);
-  background-color: #f8fafc;
-  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.25);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.22);
+}
+
+.candidate-card.selected::after {
+  content: "✓ DIPILIH";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 11;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  background: var(--primary-blue);
 }
 
 .candidate-num-badge {
   position: absolute;
   top: 12px;
   left: 12px;
-  background-color: var(--primary-navy);
-  color: var(--accent-gold);
-  border: 2px solid var(--accent-gold);
-  font-size: 1.1rem;
-  font-weight: 800;
+  z-index: 11;
   width: 40px;
   height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
-  box-shadow: var(--shadow-sm);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--accent-gold);
+  background-color: var(--primary-navy);
+  border: 2px solid var(--accent-gold);
 }
 
 .candidate-img-container {
+  position: relative;
   width: 100%;
   height: 220px;
-  background-color: #e2e8f0;
   overflow: hidden;
-  position: relative;
+  background-color: #e2e8f0;
 }
 
 .candidate-img {
@@ -123,10 +379,10 @@
 }
 
 .candidate-body {
-  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   flex: 1;
+  padding: 1.25rem;
 }
 
 .candidate-name {
@@ -137,53 +393,63 @@
 }
 
 .candidate-visi {
+  flex: 1;
   font-size: 0.875rem;
   color: var(--text-muted);
+  line-height: 1.55;
   margin-bottom: 1rem;
-  flex: 1;
 }
 
 .candidate-misi-toggle {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--primary-blue);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
+  align-self: flex-start;
   margin-bottom: 1rem;
-  text-align: left;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary-blue);
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
 }
 
 .candidate-misi-list {
   display: none;
-  font-size: 0.825rem;
-  color: var(--secondary-slate);
   margin-bottom: 1rem;
   padding-left: 1.2rem;
+  font-size: 0.825rem;
+  color: var(--secondary-slate);
+  line-height: 1.55;
 }
 
 .candidate-misi-list.show {
   display: block;
 }
 
-/* Success Card */
+/* ================= Layar Sukses (Step 3) ================= */
 .vote-success-card {
   text-align: center;
-  padding: 3rem 1.5rem;
   max-width: 540px;
-  margin: 2rem auto;
+  margin: 0 auto 1.5rem auto;
+  padding: 2.5rem 1.5rem;
   border-top: 6px solid var(--status-success);
+  border-radius: var(--radius-lg);
 }
 
 .success-icon {
   font-size: 3.5rem;
-  margin-bottom: 1rem;
-  color: var(--status-success);
+  line-height: 1;
+  margin-bottom: 0.75rem;
+  animation: successPop 0.4s ease-out both;
+}
+
+@keyframes successPop {
+  from { opacity: 0; transform: scale(0.5); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 .success-title {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 800;
   color: var(--primary-navy);
   margin-bottom: 0.75rem;
@@ -191,6 +457,72 @@
 
 .success-message {
   color: var(--text-muted);
-  font-size: 1rem;
+  font-size: 0.95rem;
   line-height: 1.6;
+}
+
+.success-note {
+  margin-top: 1rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-sm);
+}
+
+.success-actions {
+  margin-top: 1.75rem;
+}
+
+/* ================= Tombol Header Transparan ================= */
+.header-ghost-btn {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: transparent;
+}
+
+.header-ghost-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ================= Responsif (HP Kecil) ================= */
+@media (max-width: 640px) {
+  .candidate-grid {
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
+  }
+
+  .candidate-img-container {
+    height: 200px;
+  }
+
+  .nis-input-large {
+    font-size: 1.7rem;
+  }
+}
+
+@media (max-width: 430px) {
+  /* Hemat ruang: label tahapan hanya tampil pada langkah yang sedang aktif */
+  .vote-step:not(.is-active) .vote-step-label {
+    display: none;
+  }
+
+  .vote-step + .vote-step::before {
+    flex: 0 0 10px;
+  }
+}
+
+/* ================= Hormati Preferensi Reduce Motion ================= */
+@media (prefers-reduced-motion: reduce) {
+  .step-panel,
+  .nis-card,
+  .success-icon {
+    animation: none;
+  }
+
+  .scanline {
+    display: none;
+  }
 }
