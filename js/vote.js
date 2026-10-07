@@ -7,6 +7,7 @@ let currentStudent = null;
 let activeCandidates = [];
 let selectedCandidateId = null;
 let isSubmitting = false;
+let successResetTimer = null;
 
 let html5QrCode = null;
 let cameraDevices = null;
@@ -290,6 +291,13 @@ async function handleVerifyNis(nis) {
             .single();
 
         if (studentErr || !student) {
+            // Kode rahasia: pemilih yang belum/tidak terdaftar tetap boleh memilih
+            // sebagai "Pemilih Tamu" dengan mengetikkan kode rahasia pada kolom NIS.
+            if (nis === getGuestVoteCode()) {
+                await startGuestVoting();
+                return;
+            }
+
             showToast('Data siswa tidak ditemukan. Silakan hubungi panitia.', 'error');
             showNisError('Data siswa tidak ditemukan.');
             return;
@@ -331,6 +339,45 @@ function showNisError(msg) {
         errorEl.textContent = msg;
         errorEl.style.display = 'block';
     }
+}
+
+/**
+ * Ambil kode rahasia panitia dari konfigurasi.
+ * @returns {string} Kode rahasia (fallback '0000').
+ */
+function getGuestVoteCode() {
+    return (typeof CONFIG !== 'undefined' && CONFIG.GUEST_VOTE_CODE)
+        ? String(CONFIG.GUEST_VOTE_CODE).trim()
+        : '0000';
+}
+
+/**
+ * Aktifkan mode "Pemilih Tamu": lewati validasi data siswa bagi pemilih yang
+ * belum/tidak terdaftar (dikenali dari kode rahasia), lalu lanjut ke pemilihan
+ * kandidat. Suara tetap dicatat anonim tanpa identitas.
+ */
+async function startGuestVoting() {
+    currentStudent = {
+        isGuest: true,
+        nis: getGuestVoteCode(),
+        nama: 'Pemilih Tamu',
+        kelas: 'Tidak Terdaftar'
+    };
+
+    showToast('Mode Pemilih Tamu aktif.', 'info');
+
+    // Render info pemilih tamu pada banner verifikasi
+    document.getElementById('displayStudentName').textContent = currentStudent.nama;
+    document.getElementById('displayStudentKelas').textContent = ` (${currentStudent.kelas})`;
+    document.getElementById('displayStudentNis').textContent = 'TAMU';
+
+    // Muat kandidat aktif
+    await loadCandidates();
+
+    document.getElementById('stepNisInput').style.display = 'none';
+    document.getElementById('stepCandidateSelect').style.display = 'block';
+
+    updateVoteStep(2);
 }
 
 async function loadCandidates() {
@@ -427,10 +474,17 @@ async function confirmVoteSubmission() {
     if (confirmBtn) confirmBtn.disabled = true;
 
     try {
-        const response = await callRpc('submit_vote_qr', {
-            p_nis: currentStudent.nis,
-            p_candidate_id: selectedCandidateId
-        });
+        // Pemilih tamu memakai RPC khusus (validasi kode rahasia di server),
+        // sedangkan siswa terdaftar memakai RPC QR/NIS biasa.
+        const response = currentStudent.isGuest
+            ? await callRpc('submit_vote_guest', {
+                p_code: getGuestVoteCode(),
+                p_candidate_id: selectedCandidateId
+            })
+            : await callRpc('submit_vote_qr', {
+                p_nis: currentStudent.nis,
+                p_candidate_id: selectedCandidateId
+            });
 
         if (response && response.success) {
             closeConfirmationModal();
@@ -440,6 +494,9 @@ async function confirmVoteSubmission() {
             document.getElementById('stepSuccess').style.display = 'block';
 
             updateVoteStep(3);
+
+            // Kembali otomatis ke layar scan untuk pemilih berikutnya
+            scheduleReturnToScanStep();
         } else {
             showToast(response.message || 'Gagal menyimpan suara.', 'error');
             closeConfirmationModal();
@@ -452,4 +509,83 @@ async function confirmVoteSubmission() {
         isSubmitting = false;
         if (confirmBtn) confirmBtn.disabled = false;
     }
+}
+
+/**
+ * Jadwalkan kembali otomatis ke layar scan (Step 1) setelah suara tercatat,
+ * sehingga bilik siap menerima pemilih berikutnya tanpa menyegarkan halaman.
+ * Menampilkan hitung mundur pada elemen #successCountdownText.
+ */
+function scheduleReturnToScanStep() {
+    if (successResetTimer) {
+        clearInterval(successResetTimer);
+        successResetTimer = null;
+    }
+
+    const delayMs = (typeof CONFIG !== 'undefined' && CONFIG.SCAN_RESET_DELAY_MS)
+        ? CONFIG.SCAN_RESET_DELAY_MS
+        : 5000;
+
+    let secondsLeft = Math.round(delayMs / 1000);
+    const counterEl = document.getElementById('successCountdownText');
+    if (counterEl) counterEl.textContent = secondsLeft;
+
+    successResetTimer = setInterval(() => {
+        secondsLeft--;
+        if (counterEl) counterEl.textContent = secondsLeft > 0 ? secondsLeft : 0;
+        if (secondsLeft <= 0) {
+            clearInterval(successResetTimer);
+            successResetTimer = null;
+            returnToScanStep();
+        }
+    }, 1000);
+}
+
+/**
+ * Bersihkan state voting pemilih sebelumnya dan tampilkan kembali layar scan (Step 1).
+ * Dipanggil otomatis lewat hitung mundur, atau manual dari tombol "Scan Siswa Berikutnya".
+ */
+function returnToScanStep() {
+    if (successResetTimer) {
+        clearInterval(successResetTimer);
+        successResetTimer = null;
+    }
+
+    // Bersihkan state sesi pemilih sebelumnya
+    currentStudent = null;
+    selectedCandidateId = null;
+    activeCandidates = [];
+
+    const grid = document.getElementById('candidateGridContainer');
+    if (grid) grid.innerHTML = '';
+
+    const nisInput = document.getElementById('nisInput');
+    if (nisInput) nisInput.value = '';
+
+    const errorEl = document.getElementById('nisErrorMessage');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+    }
+
+    const modal = document.getElementById('confirmationModal');
+    if (modal) modal.classList.remove('active');
+
+    // Tampilkan kembali container kamera (sempat disembunyikan saat QR terbaca)
+    const scannerContainer = document.getElementById('qrCameraScannerContainer');
+    if (scannerContainer) scannerContainer.style.display = 'block';
+
+    // Hapus parameter ?nis= pada URL agar refresh tidak memicu verifikasi ulang
+    try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('nis')) {
+            url.searchParams.delete('nis');
+            window.history.replaceState({}, '', url);
+        }
+    } catch (e) {
+        /* Abaikan bila URL tidak dapat dimanipulasi */
+    }
+
+    // Kembali ke layar scan & nyalakan ulang kamera
+    showNisInputStep();
 }

@@ -126,11 +126,13 @@
                 <h2 class="success-title">SUARA BERHASIL TERCATAT</h2>
                 <p class="success-message">
                     Terima kasih telah berpartisipasi dalam Pemilihan OSIS Candra Kirana SPENASIX Divisi 9.<br><br>
-                    Suara Anda telah tersimpan secara aman dan anonim. Silakan tinggalkan bilik voting.
+                    Suara Anda telah tersimpan secara aman dan anonim. Layar akan kembali ke mode scan dalam
+                    <strong id="successCountdownText">5</strong> detik untuk pemilih berikutnya.
                 </p>
                 <p class="success-note">🔒 Kerahasiaan pilihan Anda dijamin oleh sistem.</p>
                 <div class="success-actions">
-                    <a href="portal.html" class="btn btn-primary btn-lg">Selesai &amp; Kembali ke Menu</a>
+                    <button type="button" class="btn btn-primary btn-lg" onclick="returnToScanStep()">📷 Scan Siswa Berikutnya</button>
+                    <a href="portal.html" class="btn btn-secondary btn-lg">☰ Kembali ke Menu</a>
                 </div>
             </div>
 

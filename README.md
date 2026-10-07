@@ -30,6 +30,19 @@ Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, be
 ├── admin.html               # Portal Admin Panitia & Dashboard Realtime
 ├── id-cards.html            # Generator & Printable ID Card Siswa + QR Code
 ├── data_siswa_contoh.csv    # File CONTOH SPREADSHEET Data Siswa
+├── data_siswa_spenasix.csv  # Data SIAP IMPOR semua siswa (ekspor Dapodik, 763 siswa)
+├── data_siswa_7AB.csv       # Pasangan 7A + 7B (64 siswa)
+├── data_siswa_7CD.csv       # Pasangan 7C + 7D (64 siswa)
+├── data_siswa_7EF.csv       # Pasangan 7E + 7F (64 siswa)
+├── data_siswa_7GH.csv       # Pasangan 7G + 7H (64 siswa)
+├── data_siswa_8AB.csv       # Pasangan 8A + 8B (64 siswa)
+├── data_siswa_8CD.csv       # Pasangan 8C + 8D (64 siswa)
+├── data_siswa_8EF.csv       # Pasangan 8E + 8F (64 siswa)
+├── data_siswa_8GH.csv       # Pasangan 8G + 8H (63 siswa)
+├── data_siswa_9AB.csv       # Pasangan 9A + 9B (64 siswa)
+├── data_siswa_9CD.csv       # Pasangan 9C + 9D (64 siswa)
+├── data_siswa_9EF.csv       # Pasangan 9E + 9F (64 siswa)
+├── data_siswa_9GH.csv       # Pasangan 9G + 9H (60 siswa)
 │
 ├── css/
 │   ├── style.css            # Base design system & official school identity
@@ -101,6 +114,10 @@ NIS,Nama Lengkap,Kelas
 
 > 💡 **Unduh Template:** Di halaman `admin.html` tab **"👥 Kelola & Impor Siswa"**, tersedia tombol **"📥 Unduh Format Excel Contoh"** untuk langsung mendownload file `.xlsx` template resmi.
 
+> 📄 **Data Siap Impor dari Ekspor Dapodik:** File `data_siswa_spenasix.csv` berisi **763 data siswa** hasil konversi dari ekspor *Daftar Peserta Didik* sekolah. Dari file ekspor tersebut hanya dipakai 3 kolom: **NIPD** (dipetakan sebagai kolom `NIS` 4 digit), **Nama** (menjadi `Nama Lengkap`), dan **Rombel Saat Ini** (menjadi `Kelas`). Kolom `No`, `JK`, dan `NISN` tidak dipakai.
+
+> 🗂️ **Versi Terpisah Per 2 Rombel:** Data yang sama juga tersedia terpecah menjadi **12 file** (tiap file = 2 rombel berurutan), mis. `data_siswa_7AB.csv` (7A+7B), `data_siswa_7CD.csv` (7C+7D), dan seterusnya hingga `data_siswa_9GH.csv` (9G+9H). Semua file memakai format kolom & encoding yang persis sama, jumlah total tetap **763 siswa**, dan dapat diimpor satu per satu melalui tab **"👥 Kelola & Impor Siswa"**.
+
 > 🗑️ **Hapus Massal Siswa (multi-select):** Pada tabel **Daftar Siswa**, centang kolom paling kiri untuk memilih beberapa baris (atau centang kotak pada baris header untuk memilih semua). Bilah aksi **"Hapus Terpilih"** akan muncul menampilkan jumlah data terpilih, lalu klik **[ 🗑️ Hapus Terpilih ]** untuk menghapus beberapa data NIS sekaligus tanpa perlu satu per satu.
 
 ---
@@ -141,6 +158,7 @@ cd evoting-spenasix-divisi9
 3. Skrip ini akan membuat tabel (`students`, `candidates`, `ballots`, `election_settings`, `voting_rooms`, `voting_sessions`, `audit_logs`), mengaktifkan RLS, serta memasang fungsi RPC atomik (`submit_vote_qr`, `submit_vote_room`, `activate_room`, `assign_student_to_room`, `get_admin_dashboard_stats`).
 4. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261006_room_vote_management.sql`.** File ini menambahkan RPC manajemen bilik: `deactivate_room` (Keluar Mode Bilik dari terminal), `delete_voting_room` (Hapus bilik dari daftar), dan `reset_votes_only` (Reset seluruh suara tanpa mematikan perangkat bilik).
 5. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261007_bulk_delete.sql`.** File ini menambahkan RPC **hapus massal (multi-select)** pada tab Kelola Siswa & Kelola Kandidat: `delete_students_batch` (Hapus banyak siswa sekaligus, sesi voting ikut terhapus via CASCADE) dan `delete_candidates_batch` (Hapus banyak kandidat sekaligus dengan validasi tidak boleh menghapus kandidat yang sudah punya suara).
+6. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261008_guest_vote.sql`.** File ini menambahkan RPC **`submit_vote_guest`** — **kode rahasia** panitia (default **`0000`**) yang memungkinkan pemilih **belum/tidak terdaftar** tetap memberikan suara sebagai **Tamu** pada halaman Voting ID Card (`vote.html`). Suara tamu dicatat **anonim** tanpa identitas (hanya tersimpan pada tabel `ballots`).
 
 ### 4. Eksekusi Seed Data Awal
 1. Di SQL Editor Supabase, salin dan jalankan isi file `supabase/seed.sql`.
@@ -157,7 +175,7 @@ Beberapa error umum saat menjalankan migrasi beserta solusinya:
 
 - **`42710: policy "..." already exists`** — Terjadi bila `20261005` dijalankan ulang. File sudah dibuat idempotent (`DROP POLICY IF EXISTS` sebelum setiap `CREATE POLICY`), jadi cukup jalankan ulang seluruh file dari awal.
 - **`DELETE requires a WHERE clause` / `UPDATE requires a WHERE clause`** — Muncul saat memakai tombol **Reset Suara Saja** / **Reset Total**. Ini berasal dari guard extension **`pg_safeupdate`** milik Supabase yang menolak `DELETE`/`UPDATE` tanpa `WHERE`, termasuk di dalam fungsi `SECURITY DEFINER`. Fungsi `reset_votes_only()`, `reset_all_rooms()`, dan `reset_total_election()` sudah diberi `WHERE TRUE` agar lolos guard. **Jalankan ulang** `20261005_initial_schema.sql` dan `20261006_room_vote_management.sql` agar fungsi ter-`CREATE OR REPLACE` dengan versi terbaru.
-- **`function public.xxx() does not exist` / `PGRST202`** — Fungsi RPC belum terpasang karena migrasi yang mendefinisikannya belum dijalankan (atau berhenti di tengah karena error). Jalankan migrasi sesuai urutan `20261005` → `20261006` → `20261007`.
+- **`function public.xxx() does not exist` / `PGRST202`** — Fungsi RPC belum terpasang karena migrasi yang mendefinisikannya belum dijalankan (atau berhenti di tengah karena error). Jalankan migrasi sesuai urutan `20261005` → `20261006` → `20261007` → `20261008`.
 - **`could not find the function ... in the schema cache`** — PostgREST sedang menyegarkan cache skema. Tunggu ±10 detik lalu ulangi; jika tetap muncul, gunakan tombol *Reload schema cache* pada Supabase Dashboard → *Settings* → *API*.
 
 ---
@@ -175,6 +193,8 @@ Beberapa error umum saat menjalankan migrasi beserta solusinya:
 3. Arahkan kamera ke QR Code ID Card fisik (kartu absen) siswa.
 4. Sistem membaca NIS 4-digit secara otomatis, menutup kamera, dan **langsung menampilkan 1 Halaman Surat Suara Kandidat**.
 5. Siswa memilih kandidat, meninjau modal konfirmasi, dan menekan **[ KONFIRMASI SUARA ]**.
+6. Setelah suara tercatat, layar menampilkan **"SUARA BERHASIL TERCATAT"** beserta **hitung mundur ±5 detik**, lalu **otomatis kembali ke langkah Verifikasi/Scan** sehingga pemilih berikutnya dapat langsung scan tanpa memuat ulang halaman. Tersedia pula tombol **📷 Scan Siswa Berikutnya** (kembali seketika) dan **☰ Kembali ke Menu** (ke portal). Durasi hitung mundur dapat diubah lewat `SCAN_RESET_DELAY_MS` pada `js/config.js`.
+7. **Kode Rahasia untuk Pemilih Belum/Tidak Terdaftar (Tamu).** Bila NIS pemilih tidak ditemukan di basis data, panitia dapat meminta pemilih mengetikkan **kode rahasia** (default **`0000`**) pada kolom *Masukkan NIS 4 Digit*. Sistem akan melewati validasi data siswa dan pemilih lanjut memilih sebagai **"Pemilih Tamu"**; suara tetap tersimpan **anonim**. Kode dapat diubah pada `GUEST_VOTE_CODE` di `js/config.js` **dan harus sama** dengan `v_secret_code` di dalam fungsi `submit_vote_guest` pada `supabase/migrations/20261008_guest_vote.sql` (validasi dilakukan di sisi server).
 
 ### 3. Mengaktifkan Komputer Bilik Voting (Metode B)
 1. Di setiap komputer bilik, buka URL `/voting-room.html`.
@@ -202,6 +222,8 @@ Beberapa error umum saat menjalankan migrasi beserta solusinya:
    Fungsi database `submit_vote_qr` dan `submit_vote_room` menggunakan perintah `FOR UPDATE` (row lock) dan transaksi atomik. Jika ada 2 request bersamaan untuk 1 NIS yang sama, request pertama akan `SUCCESS` dan request kedua otomatis `REJECTED`.
 3. **Pemberhentian Akses Hasil untuk Siswa:**
    Row Level Security (RLS) melarang role anonim/siswa melakukan query pada tabel `ballots` atau agregat kandidat. Hasil suara kandidat hanya tersedia untuk admin terotentikasi.
+4. **Kode Rahasia Pemilih Tamu (Guest):**
+   RPC `submit_vote_guest` memvalidasi kode rahasia **di sisi server** (bukan hanya di klien), sehingga hanya pemegang kode yang dapat memicu pencatatan suara tamu. Suara tamu disimpan **sepenuhnya anonim** pada tabel `ballots` (tanpa entri pada tabel `students`, tanpa `student_id`). Karena satu kode dapat dipakai berkali-kali oleh pemilih berbeda, **panitia wajib menjaga kerahasiaan kode ini**; seluruh suara tamu tetap terhapus oleh Reset Suara/Reset Total.
 
 ---
 

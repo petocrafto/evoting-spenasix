@@ -17,7 +17,18 @@ const CONFIG = {
     SESSION_EXPIRY_SECONDS: 600, // 10 minutes
     
     // Auto Reset Delay after voting complete on Bilik (in milliseconds)
-    ROOM_RESET_DELAY_MS: 5000
+    ROOM_RESET_DELAY_MS: 5000,
+
+    // Auto Return Delay after voting complete on QR Scan page (in milliseconds)
+    // Setelah sukses, layar otomatis kembali ke mode scan untuk pemilih berikutnya.
+    SCAN_RESET_DELAY_MS: 5000,
+
+    // Kode rahasia panitia (secret code).
+    // Pemilih yang belum / tidak terdaftar dapat tetap memberikan suara sebagai
+    // "Pemilih Tamu" dengan mengetikkan kode ini pada kolom NIS di vote.html.
+    // Harap dirahasiakan; ubah bila perlu. Harus 4 digit angka agar lolos
+    // validasi input NIS (pattern \d{4}).
+    GUEST_VOTE_CODE: '0000'
 };
 
 // Check if credentials are placeholders

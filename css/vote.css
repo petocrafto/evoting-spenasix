@@ -474,6 +474,14 @@
 
 .success-actions {
   margin-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
+.success-actions .btn {
+  width: 100%;
 }
 
 /* ================= Tombol Header Transparan ================= */

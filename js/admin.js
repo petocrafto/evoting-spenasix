@@ -1163,7 +1163,7 @@ function describeRpcError(err, fallback) {
     const code = err.code || '';
     // 42883 = undefined_function, PGRST202 = function tidak ditemukan di schema cache PostgREST
     if (code === '42883' || code === 'PGRST202' || /does not exist|could not find the function|schema cache/i.test(raw)) {
-        return `Fungsi database belum terpasang di Supabase (${raw}). Jalankan migrasi terbaru (20261005 -> 20261006 -> 20261007) di Supabase SQL Editor.`;
+        return `Fungsi database belum terpasang di Supabase (${raw}). Jalankan migrasi terbaru (20261005 -> 20261006 -> 20261007 -> 20261008) di Supabase SQL Editor.`;
     }
     return `${fallback} (${raw})`;
 }
