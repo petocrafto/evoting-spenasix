@@ -151,6 +151,15 @@ cd evoting-spenasix-divisi9
 2. Klik **Add User -> Create User**.
 3. Masukkan Email (misal: `admin@spenasix.sch.id`) dan Password. Akun ini yang digunakan untuk login di `admin.html`.
 
+### 6. Troubleshooting Migrasi
+
+Beberapa error umum saat menjalankan migrasi beserta solusinya:
+
+- **`42710: policy "..." already exists`** — Terjadi bila `20261005` dijalankan ulang. File sudah dibuat idempotent (`DROP POLICY IF EXISTS` sebelum setiap `CREATE POLICY`), jadi cukup jalankan ulang seluruh file dari awal.
+- **`DELETE requires a WHERE clause` / `UPDATE requires a WHERE clause`** — Muncul saat memakai tombol **Reset Suara Saja** / **Reset Total**. Ini berasal dari guard extension **`pg_safeupdate`** milik Supabase yang menolak `DELETE`/`UPDATE` tanpa `WHERE`, termasuk di dalam fungsi `SECURITY DEFINER`. Fungsi `reset_votes_only()`, `reset_all_rooms()`, dan `reset_total_election()` sudah diberi `WHERE TRUE` agar lolos guard. **Jalankan ulang** `20261005_initial_schema.sql` dan `20261006_room_vote_management.sql` agar fungsi ter-`CREATE OR REPLACE` dengan versi terbaru.
+- **`function public.xxx() does not exist` / `PGRST202`** — Fungsi RPC belum terpasang karena migrasi yang mendefinisikannya belum dijalankan (atau berhenti di tengah karena error). Jalankan migrasi sesuai urutan `20261005` → `20261006` → `20261007`.
+- **`could not find the function ... in the schema cache`** — PostgREST sedang menyegarkan cache skema. Tunggu ±10 detik lalu ulangi; jika tetap muncul, gunakan tombol *Reload schema cache* pada Supabase Dashboard → *Settings* → *API*.
+
 ---
 
 ## 🖥️ Panduan Operasional Hari Pemilihan

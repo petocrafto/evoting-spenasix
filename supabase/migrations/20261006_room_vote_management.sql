@@ -122,24 +122,27 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+    -- CATATAN: WHERE TRUE ditambahkan agar lolos guard pg_safeupdate Supabase.
     -- 1. Clear all ballots
-    DELETE FROM public.ballots;
+    DELETE FROM public.ballots WHERE TRUE;
 
     -- 2. Clear all voting sessions
-    DELETE FROM public.voting_sessions;
+    DELETE FROM public.voting_sessions WHERE TRUE;
 
     -- 3. Reset all students back to NOT_VOTED (keep NIS/nama/kelas)
     UPDATE public.students
     SET has_voted = FALSE,
         voting_status = 'NOT_VOTED',
         voted_at = NULL,
-        updated_at = NOW();
+        updated_at = NOW()
+    WHERE TRUE;
 
     -- 4. Keep room activation intact; only clear the per-session pointer
     UPDATE public.voting_rooms
     SET status = CASE WHEN device_token IS NOT NULL THEN 'READY' ELSE 'OFFLINE' END,
         current_session_id = NULL,
-        updated_at = NOW();
+        updated_at = NOW()
+    WHERE TRUE;
 
     INSERT INTO public.audit_logs (actor_type, action, details)
     VALUES ('ADMIN', 'RESET_VOTES_ONLY', jsonb_build_object('message', 'Seluruh suara di-reset; perangkat bilik tetap aktif.'));

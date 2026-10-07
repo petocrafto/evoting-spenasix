@@ -703,11 +703,13 @@ BEGIN
     WHERE has_voted = FALSE AND voting_status = 'IN_PROGRESS';
 
     -- Reset all voting rooms to OFFLINE and revoke device tokens
+    -- (WHERE TRUE agar lolos guard pg_safeupdate Supabase yang menolak DML tanpa WHERE)
     UPDATE public.voting_rooms
     SET status = 'OFFLINE',
         device_token = NULL,
         current_session_id = NULL,
-        updated_at = NOW();
+        updated_at = NOW()
+    WHERE TRUE;
 
     -- Audit log
     INSERT INTO public.audit_logs (actor_type, action, details)
@@ -724,29 +726,35 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+    -- CATATAN: WHERE TRUE ditambahkan di setiap DML tanpa filter agar lolos
+    -- guard pg_safeupdate Supabase (error: "DELETE/UPDATE requires a WHERE clause").
+
     -- 1. Truncate/Clear Ballots
-    DELETE FROM public.ballots;
+    DELETE FROM public.ballots WHERE TRUE;
 
     -- 2. Clear Voting Sessions
-    DELETE FROM public.voting_sessions;
+    DELETE FROM public.voting_sessions WHERE TRUE;
 
     -- 3. Reset All Students status to NOT_VOTED
     UPDATE public.students
     SET has_voted = FALSE,
         voting_status = 'NOT_VOTED',
         voted_at = NULL,
-        updated_at = NOW();
+        updated_at = NOW()
+    WHERE TRUE;
 
     -- 4. Reset All Rooms to OFFLINE
     UPDATE public.voting_rooms
     SET status = 'OFFLINE',
         device_token = NULL,
         current_session_id = NULL,
-        updated_at = NOW();
+        updated_at = NOW()
+    WHERE TRUE;
 
     -- 5. Set Election Status to DRAFT
     UPDATE public.election_settings
-    SET status = 'DRAFT', updated_at = NOW();
+    SET status = 'DRAFT', updated_at = NOW()
+    WHERE TRUE;
 
     -- 6. Audit log
     INSERT INTO public.audit_logs (actor_type, action, details)
