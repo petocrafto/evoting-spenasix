@@ -578,7 +578,7 @@ async function deleteSelectedStudents() {
         }
     } catch (err) {
         console.error('Bulk delete students error:', err);
-        showToast('Terjadi kesalahan saat menghapus data siswa.', 'error');
+        showToast(describeRpcError(err, 'Terjadi kesalahan saat menghapus data siswa.'), 'error');
     } finally {
         if (btn) btn.disabled = false;
     }
@@ -908,7 +908,7 @@ async function deleteSelectedCandidates() {
         }
     } catch (err) {
         console.error('Bulk delete candidates error:', err);
-        showToast('Terjadi kesalahan saat menghapus kandidat.', 'error');
+        showToast(describeRpcError(err, 'Terjadi kesalahan saat menghapus kandidat.'), 'error');
     } finally {
         if (btn) btn.disabled = false;
     }
@@ -1151,6 +1151,23 @@ async function deleteVotingRoom(roomCode) {
     }
 }
 
+/* ==========================================
+   RPC ERROR HELPER
+   Menampilkan pesan error SEBENARNYA dari Supabase RPC.
+   Jika fungsi RPC belum ada di database (migrasi belum
+   dijalankan), beri petunjuk menjalankan file migrasi.
+   ========================================== */
+function describeRpcError(err, fallback) {
+    if (!err) return fallback;
+    const raw = err.message || err.details || String(err);
+    const code = err.code || '';
+    // 42883 = undefined_function, PGRST202 = function tidak ditemukan di schema cache PostgREST
+    if (code === '42883' || code === 'PGRST202' || /does not exist|could not find the function|schema cache/i.test(raw)) {
+        return `Fungsi database belum terpasang di Supabase (${raw}). Jalankan migrasi terbaru (20261005 -> 20261006 -> 20261007) di Supabase SQL Editor.`;
+    }
+    return `${fallback} (${raw})`;
+}
+
 async function executeResetAllRooms() {
     if (!confirm('Reset SELURUH perangkat bilik?\n\nSemua bilik akan kembali ke status OFFLINE dan wajib aktivasi ulang menggunakan PIN.')) {
         return;
@@ -1167,7 +1184,7 @@ async function executeResetAllRooms() {
         }
     } catch (err) {
         console.error('Reset all rooms error:', err);
-        showToast('Terjadi kesalahan saat mereset seluruh bilik.', 'error');
+        showToast(describeRpcError(err, 'Terjadi kesalahan saat mereset seluruh bilik.'), 'error');
     }
 }
 
@@ -1219,7 +1236,7 @@ async function executeResetVotesOnly() {
         }
     } catch (err) {
         console.error('Reset votes only error:', err);
-        showToast('Terjadi kesalahan saat mereset suara.', 'error');
+        showToast(describeRpcError(err, 'Terjadi kesalahan saat mereset suara.'), 'error');
     }
 }
 
@@ -1244,7 +1261,7 @@ async function executeTotalElectionReset() {
         }
     } catch (err) {
         console.error('Total election reset error:', err);
-        showToast('Terjadi kesalahan saat melakukan reset total.', 'error');
+        showToast(describeRpcError(err, 'Terjadi kesalahan saat melakukan reset total.'), 'error');
     }
 }
 
