@@ -8,6 +8,8 @@ let activeTab = 'dashboard';
 let adminRealtimeChannels = [];
 let parsedImportStudents = [];
 let allClasses = [];
+let selectedStudentIds = new Set();
+let selectedCandidateIds = new Set();
 
 document.addEventListener('DOMContentLoaded', () => {
     initAdminPage();
@@ -458,17 +460,22 @@ async function refreshStudentListTable() {
 
     const { data: students, error } = await query;
 
+    // Setiap kali tabel dimuat ulang, bersihkan pilihan agar tidak menyimpan id baris lama
+    selectedStudentIds.clear();
+
     const tbody = document.getElementById('studentsListTbody');
     tbody.innerHTML = '';
 
     if (error) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Gagal memuat data siswa.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Gagal memuat data siswa.</td></tr>';
+        syncStudentSelectionUI();
         return;
     }
 
     if (!students || students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Belum ada data siswa terdaftar.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Belum ada data siswa terdaftar.</td></tr>';
         updateStudentListSummary(0, 0, 0, kelasFilter);
+        syncStudentSelectionUI();
         return;
     }
 
@@ -480,6 +487,7 @@ async function refreshStudentListTable() {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
+            <td><input type="checkbox" class="student-row-checkbox" data-id="${s.id}" onclick="toggleStudentSelection('${s.id}', this.checked)" /></td>
             <td><strong>${escapeHtml(s.nis)}</strong></td>
             <td>${escapeHtml(s.nama)}</td>
             <td>${escapeHtml(s.kelas)}</td>
@@ -491,7 +499,89 @@ async function refreshStudentListTable() {
         tbody.appendChild(tr);
     });
 
+    // Simpan jumlah baris yang tampil untuk sinkronisasi checkbox "pilih semua"
+    tbody.dataset.rowCount = String(students.length);
+
     updateStudentListSummary(students.length, votedCount, students.length - votedCount, kelasFilter);
+    syncStudentSelectionUI();
+}
+
+/* ==========================================
+   BULK DELETE SISWA (Pilih beberapa sekaligus)
+   ========================================== */
+function toggleStudentSelection(studentId, isChecked) {
+    if (isChecked) {
+        selectedStudentIds.add(studentId);
+    } else {
+        selectedStudentIds.delete(studentId);
+    }
+    syncStudentSelectionUI();
+}
+
+function toggleSelectAllStudents(isChecked) {
+    const checkboxes = document.querySelectorAll('.student-row-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = isChecked;
+        if (isChecked) {
+            selectedStudentIds.add(cb.dataset.id);
+        } else {
+            selectedStudentIds.delete(cb.dataset.id);
+        }
+    });
+    syncStudentSelectionUI();
+}
+
+function clearStudentSelection() {
+    selectedStudentIds.clear();
+    document.querySelectorAll('.student-row-checkbox').forEach(cb => (cb.checked = false));
+    syncStudentSelectionUI();
+}
+
+function syncStudentSelectionUI() {
+    const count = selectedStudentIds.size;
+    const bar = document.getElementById('studentBulkBar');
+    const countEl = document.getElementById('studentBulkCount');
+    const selectAll = document.getElementById('studentsSelectAll');
+    const tbody = document.getElementById('studentsListTbody');
+
+    if (bar) bar.style.display = count > 0 ? 'flex' : 'none';
+    if (countEl) countEl.textContent = `${count} siswa dipilih`;
+
+    const rowCount = tbody ? parseInt(tbody.dataset.rowCount || '0', 10) : 0;
+    if (selectAll) {
+        selectAll.checked = count > 0 && count === rowCount;
+        selectAll.indeterminate = count > 0 && count < rowCount;
+    }
+}
+
+async function deleteSelectedStudents() {
+    const ids = Array.from(selectedStudentIds);
+    if (ids.length === 0) {
+        showToast('Pilih minimal satu siswa terlebih dahulu.', 'warning');
+        return;
+    }
+
+    if (!confirm(`Hapus ${ids.length} data siswa terpilih?\n\nTindakan ini tidak dapat dibatalkan.`)) return;
+
+    const btn = document.getElementById('btnDeleteSelectedStudents');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await callRpc('delete_students_batch', { p_ids: ids });
+        if (res && res.success) {
+            showToast(res.message || `${ids.length} data siswa berhasil dihapus.`, 'success');
+            // Muat ulang daftar siswa + filter kelas + statistik dashboard
+            loadStudentsTab();
+            loadDashboardStats();
+        } else {
+            showToast((res && res.message) || 'Gagal menghapus data siswa terpilih.', 'error');
+        }
+    } catch (err) {
+        console.error('Bulk delete students error:', err);
+        showToast('Terjadi kesalahan saat menghapus data siswa.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 function handleExcelFileSelect(event) {
@@ -694,8 +784,12 @@ async function loadCandidatesTab() {
     const container = document.getElementById('adminCandidatesGrid');
     container.innerHTML = '';
 
+    // Bersihkan pilihan kandidat setiap kali daftar dimuat ulang
+    selectedCandidateIds.clear();
+
     if (error || !candidates || candidates.length === 0) {
         container.innerHTML = '<p class="text-muted" style="grid-column:1/-1;">Belum ada kandidat terdaftar. Klik <strong>"➕ Tambah Kandidat Baru"</strong> untuk memasukkan kandidat.</p>';
+        syncCandidateSelectionUI();
         return;
     }
 
@@ -716,6 +810,11 @@ async function loadCandidatesTab() {
                 <span class="badge badge-${c.active ? 'ready' : 'offline'}" style="position:absolute; top:10px; right:10px;">${c.active ? 'AKTIF' : 'NON-AKTIF'}</span>
             </div>
 
+            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; font-weight:600; color:var(--secondary-slate); margin-bottom:0.75rem; cursor:pointer;">
+                <input type="checkbox" class="candidate-row-checkbox" data-id="${c.id}" onclick="toggleCandidateSelection('${c.id}', this.checked)" />
+                Pilih kandidat ini untuk dihapus massal
+            </label>
+
             <h3 style="font-size:1.15rem; font-weight:700; color:var(--primary-navy); margin-bottom:0.5rem;">Kandidat 0${c.nomor_urut} - ${escapeHtml(c.nama)}</h3>
             <p style="font-size:0.875rem; color:var(--text-muted); margin-bottom:0.75rem;"><strong>Visi:</strong> ${escapeHtml(c.visi)}</p>
             
@@ -733,6 +832,86 @@ async function loadCandidatesTab() {
         `;
         container.appendChild(card);
     });
+
+    // Simpan jumlah kartu untuk sinkronisasi checkbox "pilih semua"
+    container.dataset.rowCount = String(candidates.length);
+    syncCandidateSelectionUI();
+}
+
+/* ==========================================
+   BULK DELETE KANDIDAT (Pilih beberapa sekaligus)
+   ========================================== */
+function toggleCandidateSelection(candidateId, isChecked) {
+    if (isChecked) {
+        selectedCandidateIds.add(candidateId);
+    } else {
+        selectedCandidateIds.delete(candidateId);
+    }
+    syncCandidateSelectionUI();
+}
+
+function toggleSelectAllCandidates(isChecked) {
+    document.querySelectorAll('.candidate-row-checkbox').forEach(cb => {
+        cb.checked = isChecked;
+        if (isChecked) {
+            selectedCandidateIds.add(cb.dataset.id);
+        } else {
+            selectedCandidateIds.delete(cb.dataset.id);
+        }
+    });
+    syncCandidateSelectionUI();
+}
+
+function clearCandidateSelection() {
+    selectedCandidateIds.clear();
+    document.querySelectorAll('.candidate-row-checkbox').forEach(cb => (cb.checked = false));
+    syncCandidateSelectionUI();
+}
+
+function syncCandidateSelectionUI() {
+    const count = selectedCandidateIds.size;
+    const actions = document.getElementById('candidateBulkActions');
+    const countEl = document.getElementById('candidateBulkCount');
+    const selectAll = document.getElementById('candidatesSelectAll');
+    const container = document.getElementById('adminCandidatesGrid');
+
+    if (actions) actions.style.display = count > 0 ? 'flex' : 'none';
+    if (countEl) countEl.textContent = `${count} kandidat dipilih`;
+
+    const rowCount = container ? parseInt(container.dataset.rowCount || '0', 10) : 0;
+    if (selectAll) {
+        selectAll.checked = count > 0 && count === rowCount;
+        selectAll.indeterminate = count > 0 && count < rowCount;
+    }
+}
+
+async function deleteSelectedCandidates() {
+    const ids = Array.from(selectedCandidateIds);
+    if (ids.length === 0) {
+        showToast('Pilih minimal satu kandidat terlebih dahulu.', 'warning');
+        return;
+    }
+
+    if (!confirm(`Hapus ${ids.length} kandidat terpilih?\n\nTindakan ini tidak dapat dibatalkan.`)) return;
+
+    const btn = document.getElementById('btnDeleteSelectedCandidates');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await callRpc('delete_candidates_batch', { p_ids: ids });
+        if (res && res.success) {
+            showToast(res.message || `${ids.length} kandidat berhasil dihapus.`, 'success');
+            loadCandidatesTab();
+            loadDashboardStats();
+        } else {
+            showToast((res && res.message) || 'Gagal menghapus kandidat terpilih.', 'error');
+        }
+    } catch (err) {
+        console.error('Bulk delete candidates error:', err);
+        showToast('Terjadi kesalahan saat menghapus kandidat.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 function openCandidateModal(candidateId = null) {

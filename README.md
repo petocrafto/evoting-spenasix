@@ -101,6 +101,8 @@ NIS,Nama Lengkap,Kelas
 
 > 💡 **Unduh Template:** Di halaman `admin.html` tab **"👥 Kelola & Impor Siswa"**, tersedia tombol **"📥 Unduh Format Excel Contoh"** untuk langsung mendownload file `.xlsx` template resmi.
 
+> 🗑️ **Hapus Massal Siswa (multi-select):** Pada tabel **Daftar Siswa**, centang kolom paling kiri untuk memilih beberapa baris (atau centang kotak pada baris header untuk memilih semua). Bilah aksi **"Hapus Terpilih"** akan muncul menampilkan jumlah data terpilih, lalu klik **[ 🗑️ Hapus Terpilih ]** untuk menghapus beberapa data NIS sekaligus tanpa perlu satu per satu.
+
 ---
 
 ## 🗳️ Pengelolaan Kandidat di Admin Web
@@ -110,6 +112,7 @@ Admin panitia memiliki hak akses penuh untuk mengelola calon ketua OSIS di `admi
 - **Foto Kandidat:** Gunakan link/URL gambar publik (contoh: `https://domain.com/foto.jpg` atau dari Supabase Storage).
 - **Visi & Misi:** Visi diisi dalam kotak teks, dan Misi diisi per-baris (sistem otomatis mengubah baris baru menjadi poin-poin misi).
 - **Satu Halaman Surat Suara:** Seluruh kandidat yang berstatus **AKTIF** akan otomatis ditampilkan bersamaan dalam 1 Halaman Grid Surat Suara pada saat siswa melakukan voting.
+- **Hapus Massal Kandidat (multi-select):** Centang **"Pilih semua kandidat"** atau centang kotak **"Pilih kandidat ini"** pada beberapa kartu, lalu klik **[ 🗑️ Hapus Terpilih ]**. Kandidat yang sudah memperoleh suara tidak dapat dihapus — reset suara terlebih dahulu di tab **⚙️ Pengaturan Election**.
 
 ---
 
@@ -137,6 +140,7 @@ cd evoting-spenasix-divisi9
 2. Salin dan jalankan seluruh isi file `supabase/migrations/20261005_initial_schema.sql`.
 3. Skrip ini akan membuat tabel (`students`, `candidates`, `ballots`, `election_settings`, `voting_rooms`, `voting_sessions`, `audit_logs`), mengaktifkan RLS, serta memasang fungsi RPC atomik (`submit_vote_qr`, `submit_vote_room`, `activate_room`, `assign_student_to_room`, `get_admin_dashboard_stats`).
 4. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261006_room_vote_management.sql`.** File ini menambahkan RPC manajemen bilik: `deactivate_room` (Keluar Mode Bilik dari terminal), `delete_voting_room` (Hapus bilik dari daftar), dan `reset_votes_only` (Reset seluruh suara tanpa mematikan perangkat bilik).
+5. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261007_bulk_delete.sql`.** File ini menambahkan RPC **hapus massal (multi-select)** pada tab Kelola Siswa & Kelola Kandidat: `delete_students_batch` (Hapus banyak siswa sekaligus, sesi voting ikut terhapus via CASCADE) dan `delete_candidates_batch` (Hapus banyak kandidat sekaligus dengan validasi tidak boleh menghapus kandidat yang sudah punya suara).
 
 ### 4. Eksekusi Seed Data Awal
 1. Di SQL Editor Supabase, salin dan jalankan isi file `supabase/seed.sql`.
@@ -158,7 +162,7 @@ cd evoting-spenasix-divisi9
 
 ### 2. Voting ID Card Fisik / QR Code (Metode A)
 1. Pemilih cukup membuka alamat utama web (mis. `https://domain-sekolah/`). Halaman `index.html` menampilkan **animasi loading splash** lalu **otomatis berpindah ke `vote.html`** (kunjungan berikutnya di tab yang sama hanya butuh ±0,5 detik). Tombol "Buka Voting ID Card Sekarang" tersedia sebagai jalan pintas manual.
-2. **Kamera scanner otomatis aktif secara default.**
+2. **Kamera scanner otomatis aktif secara default.** Gunakan dropdown **📷 Kamera** untuk memilih perangkat kamera. Sistem otomatis memprioritaskan **kamera depan (webcam)** sehingga berjalan juga di **PC All-in-One (AIO) / laptop**. Tombol **🔄 Refresh Kamera** berguna bila kamera baru dicolok/diaktifkan. (Browser akan meminta izin akses kamera pada saat pertama kali — pilih **Allow/Izinkan**.)
 3. Arahkan kamera ke QR Code ID Card fisik (kartu absen) siswa.
 4. Sistem membaca NIS 4-digit secara otomatis, menutup kamera, dan **langsung menampilkan 1 Halaman Surat Suara Kandidat**.
 5. Siswa memilih kandidat, meninjau modal konfirmasi, dan menekan **[ KONFIRMASI SUARA ]**.

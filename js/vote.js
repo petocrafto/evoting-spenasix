@@ -9,6 +9,8 @@ let selectedCandidateId = null;
 let isSubmitting = false;
 
 let html5QrCode = null;
+let cameraDevices = null;
+let currentCameraId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     initVotePage();
@@ -62,7 +64,7 @@ function toggleCameraScanner() {
     }
 }
 
-function startQrScanner() {
+async function startQrScanner() {
     if (typeof Html5Qrcode === 'undefined') {
         showToast('Library scanner kamera sedang dimuat...', 'info');
         return;
@@ -72,54 +74,153 @@ function startQrScanner() {
         html5QrCode = new Html5Qrcode("reader");
     }
 
-    html5QrCode.start(
-        { facingMode: "environment" },
-        {
-            fps: 10,
-            qrbox: { width: 220, height: 220 },
-            // Cermin gambar dimatikan: hemat beban CPU pada HP kelas bawah
-            disableFlip: true,
-            // Gunakan BarcodeDetector bawaan browser bila tersedia (jauh lebih hemat daya)
-            experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-        },
-        async (decodedText) => {
-            // Extracted raw QR code text or URL
-            console.log('Scanned QR:', decodedText);
+    // Hindari error "already scanning" bila kamera dinyalakan ulang
+    await stopQrScanner(true);
 
-            // Extract 4-digit NIS from raw text or URL parameter ?nis=1234
-            let nis = null;
-            if (/^\d{4}$/.test(decodedText.trim())) {
-                nis = decodedText.trim();
-            } else {
-                const match = decodedText.match(/nis=(\d{4})/i);
-                if (match) nis = match[1];
-            }
+    // Deteksi & isi daftar kamera (termasuk kamera depan webcam PC All-in-One)
+    await loadCameraDevices();
 
-            if (nis) {
-                stopQrScanner();
-                document.getElementById('qrCameraScannerContainer').style.display = 'none';
-                document.getElementById('nisInput').value = nis;
-                showToast(`QR ID Card Terdeteksi: NIS ${nis}`, 'success');
-                await handleVerifyNis(nis);
-            } else {
-                showToast('QR Code tidak berisi 4-digit NIS valid.', 'warning');
-            }
-        },
-        (errorMessage) => {
-            // Silent scanning attempts
-        }
-    ).then(() => {
+    const select = document.getElementById('cameraDeviceSelect');
+    const chosenId = (select && select.value) || currentCameraId;
+    const chosenDevice = (cameraDevices || []).find(c => c.id === chosenId);
+    const scanConfig = buildScanConfig(chosenDevice ? chosenDevice.label : '');
+
+    // Utamakan kamera yang dipilih; jika tidak ada, fallback ke kamera belakang
+    const cameraConfig = chosenId
+        ? { deviceId: { exact: chosenId } }
+        : { facingMode: 'environment' };
+
+    try {
+        await html5QrCode.start(cameraConfig, scanConfig, onQrScanSuccess, onQrScanError);
         setScannerHint('📷 Arahkan kamera ke QR Code pada ID Card siswa', false);
-    }).catch(err => {
-        console.error('Camera access error:', err);
-        setScannerHint('⚠️ Kamera tidak dapat diakses. Silakan gunakan input NIS manual di bawah.', true);
-        showToast('Gagal mengakses kamera. Izinkan akses kamera pada browser Anda.', 'error');
-    });
+    } catch (err) {
+        console.warn('Gagal membuka kamera terpilih, mencoba kamera alternatif...', err);
+        // Fallback: kamera depan (facingMode user) — umum pada webcam PC All-in-One / laptop
+        try {
+            await html5QrCode.start({ facingMode: 'user' }, buildScanConfig('front'), onQrScanSuccess, onQrScanError);
+            setScannerHint('📷 Arahkan kamera ke QR Code pada ID Card siswa', false);
+        } catch (err2) {
+            console.error('Camera access error:', err2);
+            setScannerHint('⚠️ Kamera tidak dapat diakses. Pilih kamera lain atau gunakan input NIS manual.', true);
+            showToast('Gagal mengakses kamera. Izinkan akses kamera pada browser Anda.', 'error');
+        }
+    }
 }
 
-function stopQrScanner() {
-    if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(err => console.error(err));
+/**
+ * Bangun konfigurasi pemindaian kamera.
+ * Kamera depan menghasilkan gambar bercermin (mirror), sehingga flip harus dibiarkan
+ * aktif (disableFlip: false) agar QR Code tetap terbaca. Untuk kamera belakang HP,
+ * flip dimatikan demi menghemat beban CPU.
+ * @param {string} deviceLabel Label perangkat kamera aktif.
+ */
+function buildScanConfig(deviceLabel) {
+    const isFront = /front|user|depan|webcam|integrated|facetime|aio/i.test(deviceLabel || '');
+    return {
+        fps: 10,
+        qrbox: { width: 220, height: 220 },
+        disableFlip: !isFront,
+        // Gunakan BarcodeDetector bawaan browser bila tersedia (jauh lebih hemat daya)
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    };
+}
+
+/**
+ * Ambil daftar kamera (video input) yang tersedia dan isi dropdown pemilih kamera.
+ * Memanggil Html5Qrcode.getCameras() akan memicu izin kamera bila belum diberikan.
+ * @param {boolean} forceRefresh Paksa deteksi ulang (mis. tombol Refresh)
+ */
+async function loadCameraDevices(forceRefresh = false) {
+    const select = document.getElementById('cameraDeviceSelect');
+    if (typeof Html5Qrcode === 'undefined') return;
+
+    // Pakai cache bila sudah tersedia dan tidak dipaksa refresh
+    if (cameraDevices && cameraDevices.length && !forceRefresh) return;
+
+    try {
+        cameraDevices = await Html5Qrcode.getCameras();
+    } catch (err) {
+        console.error('Gagal mendeteksi kamera:', err);
+        if (select) select.innerHTML = '<option value="">Kamera tidak tersedia / izin ditolak</option>';
+        return;
+    }
+
+    if (!select) return;
+    select.innerHTML = '';
+
+    if (!cameraDevices || cameraDevices.length === 0) {
+        select.innerHTML = '<option value="">Kamera tidak ditemukan</option>';
+        return;
+    }
+
+    cameraDevices.forEach((cam, idx) => {
+        const opt = document.createElement('option');
+        opt.value = cam.id;
+        opt.textContent = cam.label || `Kamera ${idx + 1}`;
+        select.appendChild(opt);
+    });
+
+    // Prioritas: kamera depan (webcam PC AIO / laptop), ciri labelnya "front"/"user"/"integrated"
+    const preferred = cameraDevices.find(c =>
+        /front|user|depan|webcam|integrated|facetime|aio/i.test(c.label || '')
+    );
+    currentCameraId = preferred ? preferred.id : cameraDevices[0].id;
+    select.value = currentCameraId;
+}
+
+/**
+ * Ganti kamera aktif secara manual dari dropdown tanpa reload halaman.
+ */
+async function onCameraDeviceChange() {
+    const select = document.getElementById('cameraDeviceSelect');
+    currentCameraId = select ? select.value : null;
+    await stopQrScanner(true);
+    const container = document.getElementById('qrCameraScannerContainer');
+    if (container && container.style.display !== 'none') {
+        startQrScanner();
+    }
+}
+
+/** Callback ketika QR Code berhasil terbaca. */
+async function onQrScanSuccess(decodedText) {
+    // Extracted raw QR code text or URL
+    console.log('Scanned QR:', decodedText);
+
+    // Extract 4-digit NIS from raw text or URL parameter ?nis=1234
+    let nis = null;
+    if (/^\d{4}$/.test(decodedText.trim())) {
+        nis = decodedText.trim();
+    } else {
+        const match = decodedText.match(/nis=(\d{4})/i);
+        if (match) nis = match[1];
+    }
+
+    if (nis) {
+        await stopQrScanner(true);
+        document.getElementById('qrCameraScannerContainer').style.display = 'none';
+        document.getElementById('nisInput').value = nis;
+        showToast(`QR ID Card Terdeteksi: NIS ${nis}`, 'success');
+        await handleVerifyNis(nis);
+    } else {
+        showToast('QR Code tidak berisi 4-digit NIS valid.', 'warning');
+    }
+}
+
+/** Callback error saat proses scan (diabaikan karena percobaan baca terus berjalan). */
+function onQrScanError(errorMessage) {
+    // Silent scanning attempts
+}
+
+/**
+ * Hentikan pemindaian kamera.
+ * @param {boolean} awaitStop Bila true, tunggu proses berhenti selesai (aman sebelum start ulang).
+ */
+async function stopQrScanner(awaitStop = false) {
+    if (!html5QrCode || !html5QrCode.isScanning) return;
+
+    const stopPromise = html5QrCode.stop().catch(err => console.error(err));
+    if (awaitStop) {
+        await stopPromise;
     }
 }
 

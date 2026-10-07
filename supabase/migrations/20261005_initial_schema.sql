@@ -126,48 +126,64 @@ ALTER TABLE public.voting_rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.voting_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
+-- CATATAN: Blok policy dibuat idempotent (DROP POLICY IF EXISTS lalu CREATE POLICY)
+-- agar migrasi aman dijalankan ulang tanpa error 42710 "policy already exists".
+
 -- Election Settings Policies
+DROP POLICY IF EXISTS "Public read election status" ON public.election_settings;
 CREATE POLICY "Public read election status" ON public.election_settings
     FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin write election settings" ON public.election_settings;
 CREATE POLICY "Admin write election settings" ON public.election_settings
     FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
     WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Students Policies
+DROP POLICY IF EXISTS "Anon lookup student by NIS" ON public.students;
 CREATE POLICY "Anon lookup student by NIS" ON public.students
     FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin full access students" ON public.students;
 CREATE POLICY "Admin full access students" ON public.students
     FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
     WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Candidates Policies
+DROP POLICY IF EXISTS "Public read active candidates" ON public.candidates;
 CREATE POLICY "Public read active candidates" ON public.candidates
     FOR SELECT USING (active = true OR auth.role() = 'authenticated' OR auth.role() = 'anon');
+DROP POLICY IF EXISTS "Admin write candidates" ON public.candidates;
 CREATE POLICY "Admin write candidates" ON public.candidates
     FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
     WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Ballots Policies
+DROP POLICY IF EXISTS "Admin read ballots tally" ON public.ballots;
 CREATE POLICY "Admin read ballots tally" ON public.ballots
     FOR SELECT USING (auth.role() = 'authenticated' OR auth.role() = 'anon');
 
 -- Voting Rooms Policies
+DROP POLICY IF EXISTS "Public read room status" ON public.voting_rooms;
 CREATE POLICY "Public read room status" ON public.voting_rooms
     FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin write voting rooms" ON public.voting_rooms;
 CREATE POLICY "Admin write voting rooms" ON public.voting_rooms
     FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
     WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Voting Sessions Policies
+DROP POLICY IF EXISTS "Public read active sessions" ON public.voting_sessions;
 CREATE POLICY "Public read active sessions" ON public.voting_sessions
     FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin write voting sessions" ON public.voting_sessions;
 CREATE POLICY "Admin write voting sessions" ON public.voting_sessions
     FOR ALL USING (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role')
     WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'anon' OR auth.role() = 'service_role');
 
 -- Audit Logs Policies
+DROP POLICY IF EXISTS "Admin read audit logs" ON public.audit_logs;
 CREATE POLICY "Admin read audit logs" ON public.audit_logs
     FOR SELECT USING (auth.role() = 'authenticated' OR auth.role() = 'anon');
+DROP POLICY IF EXISTS "Public write audit logs" ON public.audit_logs;
 CREATE POLICY "Public write audit logs" ON public.audit_logs
     FOR INSERT WITH CHECK (true);
 

@@ -65,6 +65,15 @@
                         <span class="scanline" aria-hidden="true"></span>
                     </div>
                     <p class="scanner-hint" id="scannerHint">📷 Arahkan kamera ke QR Code pada ID Card siswa</p>
+
+                    <!-- Pemilih Kamera (mendukung kamera depan webcam PC All-in-One) -->
+                    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.65rem;">
+                        <label for="cameraDeviceSelect" style="font-size:0.8rem; font-weight:600; color:var(--secondary-slate); white-space:nowrap;">📷 Kamera:</label>
+                        <select id="cameraDeviceSelect" class="form-control" style="flex:1; min-width:150px; font-size:0.8rem;" onchange="onCameraDeviceChange()">
+                            <option value="">Mendeteksi kamera...</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadCameraDevices(true)">🔄 Refresh Kamera</button>
+                    </div>
                 </div>
 
                 <button type="button" id="btnToggleCameraScanner" class="btn btn-secondary btn-block btn-sm" onclick="toggleCameraScanner()">
