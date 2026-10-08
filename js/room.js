@@ -13,6 +13,20 @@ let roomSelectedCandidateId = null;
 let realtimeChannel = null;
 let sessionTimerInterval = null;
 let isRoomSubmitting = false;
+// Kunci "Keluar Mode Bilik": true selagi RPC verifikasi PIN diproses
+// (mencegah klik ganda / dua request keluar sekaligus).
+let isRoomExiting = false;
+
+// --- Auto Refresh Penugasan (kanal cadangan selain Supabase Realtime) ---
+let roomPollInterval = null;
+let isRoomSyncInFlight = false;
+// ID sesi yang sudah dinyatakan tidak valid (kadaluarsa/dibatalkan) agar tidak
+// dihidupkan ulang berulang kali oleh auto-refresh.
+let ignoredSessionId = null;
+// Timer hitung mundur auto-reset layar sukses.
+let roomResetTimer = null;
+// Fase layar terminal: 'STANDBY' | 'VOTING' | 'SUCCESS'
+let roomPhase = 'STANDBY';
 
 document.addEventListener('DOMContentLoaded', () => {
     initRoomTerminal();
@@ -110,6 +124,12 @@ async function verifyAndSetupRoom() {
 
     // Subscribe to Supabase Realtime for instant assignment updates
     setupRoomRealtimeSubscription();
+
+    // Kanal cadangan (auto-refresh): polling ringan ke server agar penugasan
+    // siswa baru tetap tampil walau Realtime tidak aktif / koneksi WebSocket
+    // sempat terputus, sehingga TIDAK perlu refresh manual lagi.
+    startRoomAutoSync();
+    await syncRoomStateFromServer();
 }
 
 function clearRoomCredentials() {
@@ -124,6 +144,9 @@ function clearRoomCredentials() {
  * Used both when leaving Mode Bilik and when the credential is revoked.
  */
 function teardownRoomRealtime() {
+    stopRoomAutoSync();
+    clearRoomResetCountdown();
+
     if (sessionTimerInterval) {
         clearInterval(sessionTimerInterval);
         sessionTimerInterval = null;
@@ -139,48 +162,160 @@ function teardownRoomRealtime() {
     activeStudent = null;
     roomSelectedCandidateId = null;
     isRoomSubmitting = false;
+    ignoredSessionId = null;
+    roomPhase = 'STANDBY';
+    updateRoomSyncBadge('⟳ Menghubungkan...', false);
 }
 
 /**
- * "Keluar Mode Bilik" action.
- * Revokes the device token on the backend (room -> OFFLINE), clears local
- * credentials and returns the terminal to the activation screen.
+ * "Keluar Mode Bilik" action — TOMBOL INI HANYA MEMBUKA FORM PIN.
+ *
+ * Keluar Mode Bilik mengubah bilik menjadi OFFLINE dan mencabut token perangkat
+ * (perangkat harus diaktivasi ulang dengan PIN), jadi aksi ini dikunci:
+ * hanya panitia yang mengetahui PIN 6 digit bilik ini yang boleh melanjutkan.
+ * Verifikasi PIN dilakukan di sisi SERVER (RPC deactivate_room).
  */
-async function exitRoomMode() {
-    const label = roomCode ? ` (${roomCode})` : '';
-    if (!confirm(`Keluar dari Mode Bilik${label} pada perangkat ini?\n\nBilik akan diubah ke status OFFLINE dan harus diaktivasi ulang menggunakan PIN.`)) {
+function exitRoomMode() {
+    if (!roomCode || !deviceToken) {
+        showActivationScreen();
         return;
     }
 
-    const btn = document.getElementById('btnExitRoomMode');
+    const labelEl = document.getElementById('roomExitRoomLabel');
+    if (labelEl) labelEl.textContent = roomCode;
+
+    resetRoomExitForm();
+
+    const modal = document.getElementById('roomExitModal');
+    if (modal) modal.classList.add('active');
+
+    const pinField = document.getElementById('roomExitPin');
+    if (pinField) setTimeout(() => pinField.focus(), 60);
+}
+
+/** Bersihkan form PIN keluar dari sisa percobaan sebelumnya. */
+function resetRoomExitForm() {
+    const pinField = document.getElementById('roomExitPin');
+    if (pinField) {
+        pinField.value = '';
+        pinField.classList.remove('is-invalid', 'pin-shake');
+    }
+
+    const errorEl = document.getElementById('roomExitError');
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+    }
+}
+
+function closeRoomExitModal() {
+    resetRoomExitForm();
+
+    const modal = document.getElementById('roomExitModal');
+    if (modal) modal.classList.remove('active');
+}
+
+/** Tampilkan pesan kesalahan PIN di dalam modal keluar (tanpa alert browser). */
+function showRoomExitError(message) {
+    const errorEl = document.getElementById('roomExitError');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+    }
+
+    const pinField = document.getElementById('roomExitPin');
+    if (pinField) {
+        pinField.classList.add('is-invalid');
+        void pinField.offsetWidth;
+        pinField.classList.add('pin-shake');
+        pinField.focus();
+        pinField.select();
+    }
+}
+
+/**
+ * Konfirmasi keluar dari Mode Bilik.
+ * PIN 6 digit dikirim ke SERVER dan dicocokkan dengan hash PIN bilik ini.
+ * Bila PIN salah / server tidak terjangkau, bilik TIDAK dikeluarkan dan modal
+ * tetap terbuka (tidak ada kredensial yang dihapus), sehingga tombol ini tidak
+ * bisa dipakai untuk keluar secara bebas.
+ */
+async function confirmRoomExit(event) {
+    if (event) event.preventDefault();
+    if (isRoomExiting) return;
+
+    const pinField = document.getElementById('roomExitPin');
+    const pin = pinField ? pinField.value.trim() : '';
+
+    if (!/^\d{6}$/.test(pin)) {
+        showRoomExitError('PIN bilik harus 6 digit angka.');
+        showToast('PIN bilik harus 6 digit angka.', 'error');
+        return;
+    }
+
+    if (!roomCode || !deviceToken) {
+        closeRoomExitModal();
+        showActivationScreen();
+        return;
+    }
+
+    isRoomExiting = true;
+    const btn = document.getElementById('btnConfirmRoomExit');
     if (btn) btn.disabled = true;
 
+    let bolehKeluar = false;
+
     try {
-        if (deviceToken) {
-            const response = await callRpc('deactivate_room', { p_device_token: deviceToken });
-            if (response && response.success) {
-                showToast(response.message || 'Mode bilik berhasil dikeluarkan.', 'info');
-            } else {
-                showToast((response && response.message) || 'Perangkat tidak dikenali, kredensial lokal tetap dihapus.', 'warning');
-            }
+        const response = await callRpc('deactivate_room', {
+            p_device_token: deviceToken,
+            p_pin: pin
+        });
+
+        if (response && response.success) {
+            bolehKeluar = true;
+            showToast(response.message || 'Mode bilik berhasil dikeluarkan.', 'info');
+        } else {
+            const pesan = (response && response.message)
+                || 'PIN bilik salah. Keluar Mode Bilik dibatalkan.';
+            showRoomExitError(pesan);
+            showToast(pesan, 'error');
         }
     } catch (err) {
+        // Gagal menghubungi server: JANGAN hapus kredensial lokal, supaya bilik
+        // tidak bisa "keluar" hanya dengan memutus koneksi internet.
         console.error('Exit room mode error:', err);
-        showToast('Terjadi kesalahan, namun kredensial lokal tetap dihapus.', 'warning');
+        const pesan = 'Gagal memverifikasi PIN ke server. Periksa koneksi internet lalu coba lagi.';
+        showRoomExitError(pesan);
+        showToast(pesan, 'error');
     } finally {
-        teardownRoomRealtime();
-        clearRoomCredentials();
+        isRoomExiting = false;
         if (btn) btn.disabled = false;
-        showActivationScreen();
     }
+
+    // PIN tidak disimpan di memori/kolom input setelah dipakai
+    if (pinField) pinField.value = '';
+
+    if (!bolehKeluar) return;
+
+    closeRoomExitModal();
+    teardownRoomRealtime();
+    clearRoomCredentials();
+    showActivationScreen();
 }
 
 
 function resetRoomStateToStandby() {
-    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+    clearRoomResetCountdown();
+
+    if (sessionTimerInterval) {
+        clearInterval(sessionTimerInterval);
+        sessionTimerInterval = null;
+    }
+
     activeSession = null;
     activeStudent = null;
     roomSelectedCandidateId = null;
+    roomPhase = 'STANDBY';
 
     document.getElementById('roomIndicatorDot').className = 'indicator-dot ready';
     document.getElementById('displayRoomStatusText').textContent = 'SIAP';
@@ -203,14 +338,24 @@ async function loadRoomCandidates() {
 
 async function checkCurrentRoomAssignment(roomData) {
     if (roomData && roomData.current_session_id) {
-        await fetchAndStartSession(roomData.current_session_id);
+        const started = await fetchAndStartSession(roomData.current_session_id);
+        if (!started) {
+            // Sesi yang tersimpan pada bilik sudah tidak valid (kadaluarsa/dibatalkan).
+            ignoredSessionId = roomData.current_session_id;
+        }
     } else {
         resetRoomStateToStandby();
     }
 }
 
+/**
+ * Ambil detail sesi voting terbaru dari server lalu tampilkan layar voting siswa.
+ * @param {string} sessionId ID sesi pada tabel voting_sessions
+ * @returns {Promise<boolean>} true bila sesi valid dan layar voting ditampilkan
+ */
 async function fetchAndStartSession(sessionId) {
     const client = getSupabaseClient();
+    if (!client || !sessionId) return false;
 
     const { data: session, error } = await client
         .from('voting_sessions')
@@ -220,18 +365,24 @@ async function fetchAndStartSession(sessionId) {
 
     if (error || !session || session.status !== 'ACTIVE') {
         resetRoomStateToStandby();
-        return;
+        return false;
     }
+
+    // Penugasan baru mengalahkan hitung mundur auto-reset layar sukses
+    clearRoomResetCountdown();
 
     activeSession = session;
     activeStudent = session.students;
 
     // Render Student Welcome & Candidate Selection Screen
     renderStudentVotingInterface();
+    return true;
 }
 
 function renderStudentVotingInterface() {
     if (!activeStudent || !activeSession) return;
+
+    roomPhase = 'VOTING';
 
     document.getElementById('roomIndicatorDot').className = 'indicator-dot voting';
     document.getElementById('displayRoomStatusText').textContent = 'SEDANG VOTING';
@@ -261,7 +412,10 @@ function startSessionTimer(expiryDate) {
 
         if (diffMs <= 0) {
             clearInterval(sessionTimerInterval);
+            sessionTimerInterval = null;
             showToast('Sesi voting telah berakhir (timeout).', 'warning');
+            // Tandai sesi ini agar tidak dihidupkan ulang oleh auto-refresh
+            ignoredSessionId = activeSession ? activeSession.id : null;
             resetRoomStateToStandby();
             return;
         }
@@ -340,19 +494,25 @@ async function confirmRoomVoteSubmission() {
             closeRoomConfirmationModal();
             showToast('Suara berhasil tercatat!', 'success');
 
+            // Cegah submit ganda: pilihan dibersihkan & sesi lokal dikunci
+            roomSelectedCandidateId = null;
+            roomPhase = 'SUCCESS';
+
             document.getElementById('roomVotingScreen').style.display = 'none';
             document.getElementById('roomSuccessScreen').style.display = 'block';
 
-            // Auto Reset after 5 seconds back to STANDBY screen
-            let countdownSeconds = 5;
+            // Auto Reset ke layar STANDBY setelah sukses (delay dari CONFIG)
+            clearRoomResetCountdown();
+
+            let countdownSeconds = Math.max(1, Math.round(getRoomResetDelayMs() / 1000));
             const resetCounterEl = document.getElementById('autoResetCountdownText');
             if (resetCounterEl) resetCounterEl.textContent = countdownSeconds;
 
-            const resetInterval = setInterval(() => {
+            roomResetTimer = setInterval(() => {
                 countdownSeconds--;
-                if (resetCounterEl) resetCounterEl.textContent = countdownSeconds;
+                if (resetCounterEl) resetCounterEl.textContent = countdownSeconds > 0 ? countdownSeconds : 0;
                 if (countdownSeconds <= 0) {
-                    clearInterval(resetInterval);
+                    clearRoomResetCountdown();
                     resetRoomStateToStandby();
                 }
             }, 1000);
@@ -390,12 +550,169 @@ function setupRoomRealtimeSubscription() {
             console.log('Realtime Room Event:', payload);
             const newRoom = payload.new;
             if (newRoom) {
-                if (newRoom.current_session_id && newRoom.status === 'WAITING') {
-                    await fetchAndStartSession(newRoom.current_session_id);
-                } else if (!newRoom.current_session_id && (newRoom.status === 'READY' || newRoom.status === 'OFFLINE')) {
-                    resetRoomStateToStandby();
-                }
+                await handleRoomRowUpdate(newRoom);
             }
         })
         .subscribe();
+}
+
+/**
+ * Terapkan perubahan baris `voting_rooms` (dari Supabase Realtime maupun dari
+ * auto-refresh/polling) ke layar terminal bilik.
+ * @param {{status?: string, current_session_id?: string|null}} roomRow
+ */
+async function handleRoomRowUpdate(roomRow) {
+    if (!roomRow) return;
+
+    const sessionId = roomRow.current_session_id || null;
+
+    if (sessionId && sessionId !== ignoredSessionId && (!activeSession || activeSession.id !== sessionId)) {
+        const started = await fetchAndStartSession(sessionId);
+        if (!started) ignoredSessionId = sessionId;
+        return;
+    }
+
+    if (!sessionId) {
+        // Sesi sudah selesai/dibatalkan oleh server
+        ignoredSessionId = null;
+        // Layar sukses dibiarkan menyelesaikan hitung mundur auto-reset-nya
+        if (roomPhase !== 'SUCCESS') {
+            resetRoomStateToStandby();
+        }
+    }
+}
+
+/* ==========================================
+   AUTO REFRESH TERMINAL BILIK
+   ========================================== */
+
+/**
+ * Interval auto-refresh penugasan siswa (ms) dengan batas aman minimum 1000 ms.
+ * @returns {number}
+ */
+function getRoomPollIntervalMs() {
+    const configured = (typeof CONFIG !== 'undefined') ? Number(CONFIG.ROOM_POLL_INTERVAL_MS) : NaN;
+    if (!Number.isFinite(configured) || configured < 1000) return 3000;
+    return configured;
+}
+
+/**
+ * Delay auto-reset layar sukses kembali ke layar standby (ms).
+ * @returns {number}
+ */
+function getRoomResetDelayMs() {
+    const configured = (typeof CONFIG !== 'undefined') ? Number(CONFIG.ROOM_RESET_DELAY_MS) : NaN;
+    if (!Number.isFinite(configured) || configured < 1000) return 5000;
+    return configured;
+}
+
+/**
+ * Tampilkan status sinkronisasi pada status bar terminal bilik.
+ * @param {string} message Teks singkat, mis. "⟳ 10:24:31"
+ * @param {boolean} isError true bila sinkronisasi gagal
+ */
+function updateRoomSyncBadge(message, isError = false) {
+    const el = document.getElementById('roomSyncStatus');
+    if (!el) return;
+
+    el.textContent = message;
+    el.classList.toggle('is-error', !!isError);
+    el.classList.remove('sync-pulse');
+    // Paksa browser me-restart animasi kedip singkat sebagai tanda sinkron berhasil
+    void el.offsetWidth;
+    el.classList.add('sync-pulse');
+}
+
+/** Nyalakan auto-refresh terminal bilik (polling cadangan). */
+function startRoomAutoSync() {
+    stopRoomAutoSync();
+
+    const intervalMs = getRoomPollIntervalMs();
+    roomPollInterval = setInterval(() => {
+        syncRoomStateFromServer();
+    }, intervalMs);
+
+    console.log(`Auto-refresh terminal bilik aktif setiap ${intervalMs} ms.`);
+}
+
+/** Hentikan auto-refresh terminal bilik. */
+function stopRoomAutoSync() {
+    if (roomPollInterval) {
+        clearInterval(roomPollInterval);
+        roomPollInterval = null;
+    }
+}
+
+/** Hentikan hitung mundur auto-reset layar sukses (bila sedang berjalan). */
+function clearRoomResetCountdown() {
+    if (roomResetTimer) {
+        clearInterval(roomResetTimer);
+        roomResetTimer = null;
+    }
+}
+
+/**
+ * Tombol "⟳ Sinkron" pada status bar: paksa muat data penugasan terbaru.
+ */
+async function manualRoomSync() {
+    if (!roomCode || !deviceToken) return;
+    if (isRoomSyncInFlight) return;
+
+    const ok = await syncRoomStateFromServer();
+
+    if (ok === true) {
+        showToast('Sinkron bilik berhasil: data penugasan terbaru sudah dimuat.', 'info', 2500);
+    } else if (ok === false) {
+        showToast('Gagal menyinkronkan bilik. Periksa koneksi internet perangkat ini.', 'warning');
+    }
+}
+
+/**
+ * Sinkronkan status bilik & sesi aktif langsung dari server tanpa menyegarkan
+ * halaman. Dipakai oleh auto-refresh berkala dan tombol sinkron manual.
+ * @returns {Promise<boolean|null>} true berhasil, false gagal, null dilewati
+ */
+async function syncRoomStateFromServer() {
+    if (!roomCode || !deviceToken || isRoomSyncInFlight) return null;
+
+    const client = getSupabaseClient();
+    if (!client) return false;
+
+    isRoomSyncInFlight = true;
+
+    try {
+        const { data: room, error } = await client
+            .from('voting_rooms')
+            .select('room_code, status, current_session_id')
+            .eq('room_code', roomCode)
+            .eq('device_token', deviceToken)
+            .maybeSingle();
+
+        if (error) {
+            console.warn('Auto-refresh bilik gagal:', error.message);
+            updateRoomSyncBadge('⟳ Gagal sinkron', true);
+            return false;
+        }
+
+        if (!room) {
+            // Token perangkat dicabut / bilik dihapus oleh panitia
+            teardownRoomRealtime();
+            clearRoomCredentials();
+            showActivationScreen();
+            showToast('Kredensial bilik tidak valid atau telah di-reset. Silakan aktivasi ulang.', 'error');
+            return false;
+        }
+
+        const jam = new Date().toLocaleTimeString('id-ID', { hour12: false });
+        updateRoomSyncBadge(`⟳ ${jam}`, false);
+
+        await handleRoomRowUpdate(room);
+        return true;
+    } catch (err) {
+        console.error('Auto-refresh bilik error:', err);
+        updateRoomSyncBadge('⟳ Gagal sinkron', true);
+        return false;
+    } finally {
+        isRoomSyncInFlight = false;
+    }
 }

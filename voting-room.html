@@ -63,8 +63,12 @@
                             <div id="roomIndicatorDot" class="indicator-dot ready"></div>
                             <span id="displayRoomStatusText">SIAP</span>
                         </div>
+                        <button type="button" id="roomSyncStatus" class="room-sync-badge" onclick="manualRoomSync()"
+                            title="Penugasan siswa disinkronkan otomatis (auto-refresh). Klik untuk menyinkronkan sekarang.">
+                            ⟳ Menghubungkan...
+                        </button>
                     </div>
-                    <button type="button" id="btnExitRoomMode" class="btn btn-sm btn-danger" onclick="exitRoomMode()" title="Nonaktifkan perangkat ini dari Mode Bilik">
+                    <button type="button" id="btnExitRoomMode" class="btn btn-sm btn-danger" onclick="exitRoomMode()" title="Keluar dari Mode Bilik pada perangkat ini (memerlukan PIN 6 digit bilik)">
                         🔓 Keluar Mode Bilik
                     </button>
                 </div>
@@ -74,6 +78,10 @@
                     <div class="standby-icon">⏳</div>
                     <h2 class="standby-title">BILIK SIAP</h2>
                     <p class="standby-sub">Menunggu penugasan siswa dari panitia...</p>
+                    <p class="standby-sub" style="margin-top:0.75rem; font-size:0.85rem;">
+                        ⟳ Layar ini menyinkron otomatis — siswa yang ditugaskan panitia akan
+                        langsung muncul di sini tanpa perlu me-refresh halaman.
+                    </p>
                 </div>
 
                 <!-- STATE B: VOTING SCREEN (Displayed automatically via Supabase Realtime) -->
@@ -134,6 +142,41 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeRoomConfirmationModal()">[ KEMBALI ]</button>
                 <button type="button" id="btnConfirmRoomVote" class="btn btn-success" onclick="confirmRoomVoteSubmission()">[ KONFIRMASI SUARA ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROOM EXIT MODAL (Keluar Mode Bilik WAJIB PIN bilik) -->
+    <div id="roomExitModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">🔓 Keluar Mode Bilik</h3>
+            </div>
+            <div style="padding:0.5rem 0 0 0;">
+                <p style="color:var(--text-muted); font-size:0.95rem;">
+                    Keluar dari Mode Bilik <strong id="roomExitRoomLabel">BILIK-01</strong> hanya boleh dilakukan
+                    oleh panitia. Masukkan <strong>PIN 6 digit bilik ini</strong> untuk melanjutkan.
+                </p>
+
+                <form onsubmit="confirmRoomExit(event)" style="margin-top:1rem;">
+                    <div class="form-group">
+                        <label class="form-label" for="roomExitPin">PIN Bilik 6 Digit</label>
+                        <input type="password" id="roomExitPin" class="form-control pin-input" placeholder="******"
+                            maxlength="6" pattern="\d{6}" inputmode="numeric" autocomplete="off" required />
+                    </div>
+
+                    <p id="roomExitError" class="room-exit-error" style="display:none;"></p>
+
+                    <p class="room-exit-note">
+                        ⚠️ Bila PIN benar: bilik ini langsung diubah ke status <strong>OFFLINE</strong>, token perangkat
+                        dihapus, dan perangkat harus diaktivasi ulang memakai PIN. Proses keluar tercatat di log panitia.
+                    </p>
+
+                    <div class="modal-footer" style="padding:1rem 0 0 0;">
+                        <button type="button" class="btn btn-secondary" onclick="closeRoomExitModal()">[ BATAL ]</button>
+                        <button type="submit" id="btnConfirmRoomExit" class="btn btn-danger">[ KONFIRMASI KELUAR ]</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

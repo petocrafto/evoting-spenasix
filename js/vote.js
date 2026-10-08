@@ -344,12 +344,12 @@ function showNisError(msg) {
 
 /**
  * Ambil kode rahasia panitia dari konfigurasi.
- * @returns {string} Kode rahasia (fallback '0000').
+ * @returns {string} Kode rahasia (fallback '2513').
  */
 function getGuestVoteCode() {
     return (typeof CONFIG !== 'undefined' && CONFIG.GUEST_VOTE_CODE)
         ? String(CONFIG.GUEST_VOTE_CODE).trim()
-        : '0000';
+        : '2513';
 }
 
 /**
@@ -607,6 +607,11 @@ async function confirmVoteSubmission() {
         if (response && response.success) {
             closeConfirmationModal();
             showToast('Suara berhasil tercatat!', 'success');
+
+            // Anti data ganda: pilihan & form dikunci sampai layar sukses selesai,
+            // sehingga tombol konfirmasi tidak dapat mengirim suara kedua kali.
+            selectedCandidateId = null;
+            resetGuestDataForm();
 
             document.getElementById('stepCandidateSelect').style.display = 'none';
             document.getElementById('stepSuccess').style.display = 'block';

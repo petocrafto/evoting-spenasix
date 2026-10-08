@@ -75,7 +75,10 @@
                 
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
                     <h2 class="card-title">Monitoring Realtime Pemilihan</h2>
-                    <div>Status Election: <span id="displayElectionStatusBadge" class="badge badge-ready">OPEN</span></div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <span class="badge badge-secondary" id="dashboardAutoRefreshBadge" title="Dashboard menyegarkan data secara otomatis tanpa perlu me-refresh halaman.">⟳ Auto Refresh</span>
+                        <div>Status Election: <span id="displayElectionStatusBadge" class="badge badge-ready">OPEN</span></div>
+                    </div>
                 </div>
 
                 <!-- Stats Grid -->
@@ -113,7 +116,10 @@
                     <!-- Candidate Vote Tally (ADMIN ONLY) -->
                     <div class="card" style="margin-bottom:0;">
                         <div class="card-header">
-                            <h3 class="card-title">Hasil Suara Kandidat (Agregat)</h3>
+                            <div>
+                                <h3 class="card-title">Hasil Perolehan Suara Kandidat</h3>
+                                <p class="card-subtitle">Diagram lingkaran pembagian suara &amp; tabel persentase (hanya tampil untuk admin).</p>
+                            </div>
                         </div>
                         <div id="candidateTallyContainer">
                             <!-- Loaded dynamically -->

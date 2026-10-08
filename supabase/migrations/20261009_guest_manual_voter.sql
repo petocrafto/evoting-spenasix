@@ -1,5 +1,5 @@
 -- Migration: 20261009_guest_manual_voter.sql
--- Description: Mengubah mode "Pemilih Tamu" (dipicu kode rahasia, default: 0000)
+-- Description: Mengubah mode "Pemilih Tamu" (dipicu kode rahasia, default: 2513)
 --              pada halaman Voting ID Card (vote.html) dari sekadar suara anonim
 --              menjadi INPUT DATA MANUAL (nama + tipe pemilih + kelas/keterangan),
 --              yaitu cara pengisian data yang sama seperti data siswa, namun
@@ -70,7 +70,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
     -- Kode rahasia panitia. HARUS sama dengan CONFIG.GUEST_VOTE_CODE di js/config.js
-    v_secret_code CONSTANT TEXT := '0000';
+    v_secret_code CONSTANT TEXT := '2513';
     v_candidate public.candidates%ROWTYPE;
     v_nama   TEXT;
     v_detail TEXT;

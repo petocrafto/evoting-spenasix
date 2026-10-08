@@ -10,6 +10,9 @@ let parsedImportStudents = [];
 let allClasses = [];
 let selectedStudentIds = new Set();
 let selectedCandidateIds = new Set();
+// Auto-refresh dashboard: agar hasil suara kandidat selalu terbaru tanpa refresh manual
+let dashboardRefreshInterval = null;
+let isDashboardLoading = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     initAdminPage();
@@ -44,6 +47,7 @@ async function initAdminPage() {
 }
 
 function showLoginView() {
+    stopDashboardAutoRefresh();
     document.getElementById('adminLoginCard').style.display = 'block';
     document.getElementById('adminDashboardView').style.display = 'none';
 }
@@ -55,6 +59,7 @@ function showAdminView() {
 
     switchTab('dashboard');
     setupAdminRealtimeSubscriptions();
+    startDashboardAutoRefresh();
 }
 
 async function handleAdminLogin(event) {
@@ -130,6 +135,10 @@ function switchTab(tabName) {
    1. DASHBOARD TAB
    ========================================== */
 async function loadDashboardStats() {
+    // Hindari tumpang tindih request (realtime + auto-refresh)
+    if (isDashboardLoading) return;
+    isDashboardLoading = true;
+
     try {
         const stats = await callRpc('get_admin_dashboard_stats');
         if (!stats) return;
@@ -165,6 +174,49 @@ async function loadDashboardStats() {
 
     } catch (err) {
         console.error('Error loading dashboard stats:', err);
+    } finally {
+        isDashboardLoading = false;
+    }
+}
+
+/**
+ * Interval auto-refresh dashboard (ms) dengan batas aman minimum 2000 ms.
+ * @returns {number}
+ */
+function getDashboardRefreshIntervalMs() {
+    const configured = (typeof CONFIG !== 'undefined') ? Number(CONFIG.DASHBOARD_REFRESH_INTERVAL_MS) : NaN;
+    if (!Number.isFinite(configured) || configured < 2000) return 5000;
+    return configured;
+}
+
+/**
+ * Nyalakan auto-refresh dashboard: angka partisipasi & hasil suara kandidat
+ * ikut terbarui sendiri tanpa perlu menekan refresh / berpindah tab.
+ * Hanya berjalan saat tab Dashboard aktif dan halaman sedang terlihat.
+ */
+function startDashboardAutoRefresh() {
+    stopDashboardAutoRefresh();
+
+    const intervalMs = getDashboardRefreshIntervalMs();
+
+    dashboardRefreshInterval = setInterval(() => {
+        if (activeTab !== 'dashboard') return;
+        if (document.visibilityState === 'hidden') return;
+        loadDashboardStats();
+    }, intervalMs);
+
+    const badge = document.getElementById('dashboardAutoRefreshBadge');
+    if (badge) {
+        badge.textContent = `⟳ Auto ${Math.round(intervalMs / 1000)}s`;
+        badge.title = `Dashboard menyegarkan data otomatis setiap ${Math.round(intervalMs / 1000)} detik (tanpa refresh manual).`;
+    }
+}
+
+/** Hentikan auto-refresh dashboard (mis. saat logout). */
+function stopDashboardAutoRefresh() {
+    if (dashboardRefreshInterval) {
+        clearInterval(dashboardRefreshInterval);
+        dashboardRefreshInterval = null;
     }
 }
 
@@ -227,6 +279,34 @@ function renderGuestBreakdownTable(guestStats, guestTotal, guestVoted) {
     });
 }
 
+/* ------------------------------------------
+   Hasil Perolehan Suara Kandidat (Agregat)
+   Ditampilkan sebagai diagram lingkaran (donut) + tabel persentase.
+   ------------------------------------------ */
+
+/**
+ * Palet warna diagram lingkaran hasil suara kandidat.
+ * Dipakai berulang bila jumlah kandidat melebihi jumlah warna.
+ */
+const TALLY_COLORS = ['#1d4ed8', '#d97706', '#16a34a', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
+
+/**
+ * Format nomor urut kandidat menjadi 2 digit (mis. 2 -> "02").
+ * @param {number|string} nomorUrut
+ * @returns {string}
+ */
+function formatNomorUrut(nomorUrut) {
+    const num = parseInt(nomorUrut, 10);
+    if (!Number.isFinite(num)) return String(nomorUrut || '-');
+    return String(num).padStart(2, '0');
+}
+
+/**
+ * Render hasil perolehan suara kandidat dalam bentuk:
+ *   1. Diagram lingkaran (donut) pembagian suara seluruh kandidat.
+ *   2. Tabel perolehan suara: jumlah suara + persentase + mini lingkaran per kandidat.
+ * @param {Array} tally Daftar { nomor_urut, nama, total_suara } dari get_admin_dashboard_stats
+ */
 function renderCandidateTallyCards(tally) {
     const container = document.getElementById('candidateTallyContainer');
     if (!container) return;
@@ -237,19 +317,141 @@ function renderCandidateTallyCards(tally) {
         return;
     }
 
-    tally.forEach(t => {
-        const card = document.createElement('div');
-        card.className = 'tally-card';
-        card.innerHTML = `
-            <div class="tally-num">${t.nomor_urut}</div>
-            <div class="tally-details">
-                <h4 style="margin:0; font-size:1.05rem;">${escapeHtml(t.nama)}</h4>
-                <span class="text-muted" style="font-size:0.85rem;">Kandidat Nomor Urut 0${t.nomor_urut}</span>
-            </div>
-            <div class="tally-count">${t.total_suara} <span style="font-size:0.85rem; font-weight:normal; color:#64748b;">Suara</span></div>
+    const totalSuara = tally.reduce((sum, t) => sum + (Number(t.total_suara) || 0), 0);
+
+    container.appendChild(buildTallyDonut(tally, totalSuara));
+    container.appendChild(buildTallyResultTable(tally, totalSuara));
+
+    const footnote = document.createElement('p');
+    footnote.className = 'result-footnote';
+    footnote.textContent = 'Persentase dihitung dari total surat suara masuk (siswa terdaftar + pemilih tamu).';
+    container.appendChild(footnote);
+}
+
+/**
+ * Bangun diagram lingkaran (donut) pembagian suara antar kandidat.
+ * @param {Array} tally Daftar perolehan suara kandidat
+ * @param {number} totalSuara Total seluruh suara sah
+ * @returns {HTMLElement}
+ */
+function buildTallyDonut(tally, totalSuara) {
+    const RADIUS = 46;
+    const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'result-chart-wrap';
+
+    let segments = '';
+    let offset = 0;
+
+    if (totalSuara > 0) {
+        tally.forEach((t, idx) => {
+            const suara = Number(t.total_suara) || 0;
+            if (suara <= 0) return;
+
+            const warna = TALLY_COLORS[idx % TALLY_COLORS.length];
+            const panjang = (suara / totalSuara) * CIRCUMFERENCE;
+            const sisa = CIRCUMFERENCE - panjang;
+
+            segments += `<circle class="result-donut-segment" cx="60" cy="60" r="${RADIUS}"
+                fill="none" stroke="${warna}" stroke-width="14"
+                stroke-dasharray="${panjang.toFixed(3)} ${sisa.toFixed(3)}"
+                stroke-dashoffset="${(-offset).toFixed(3)}" transform="rotate(-90 60 60)">
+                <title>Kandidat ${formatNomorUrut(t.nomor_urut)} - ${escapeHtml(t.nama)}: ${suara} suara</title>
+            </circle>`;
+
+            offset += panjang;
+        });
+    } else {
+        segments = `<circle cx="60" cy="60" r="${RADIUS}" fill="none" stroke="#e2e8f0" stroke-width="14"></circle>`;
+    }
+
+    wrap.innerHTML = `
+        <svg class="result-donut" viewBox="0 0 120 120" role="img"
+            aria-label="Diagram lingkaran perolehan suara kandidat, total ${totalSuara} suara">
+            ${segments}
+        </svg>
+        <div class="result-donut-center">
+            <span class="result-donut-value">${totalSuara}</span>
+            <span class="result-donut-label">Total Suara</span>
+        </div>
+    `;
+
+    return wrap;
+}
+
+/**
+ * Bangun tabel perolehan suara kandidat (jumlah suara + persentase + mini lingkaran).
+ * @param {Array} tally Daftar perolehan suara kandidat
+ * @param {number} totalSuara Total seluruh suara sah
+ * @returns {HTMLElement}
+ */
+function buildTallyResultTable(tally, totalSuara) {
+    const table = document.createElement('table');
+    table.className = 'data-table result-table';
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th style="width:52px;">No</th>
+                <th>Kandidat</th>
+                <th style="text-align:right;">Suara</th>
+                <th style="width:78px; text-align:center;">Persentase</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    `;
+
+    const tbody = table.querySelector('tbody');
+
+    tally.forEach((t, idx) => {
+        const suara = Number(t.total_suara) || 0;
+        const persen = totalSuara > 0 ? (suara / totalSuara) * 100 : 0;
+        const warna = TALLY_COLORS[idx % TALLY_COLORS.length];
+        const noUrut = formatNomorUrut(t.nomor_urut);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <span class="result-row-num" style="border-color:${warna}; color:${warna};">${noUrut}</span>
+            </td>
+            <td>
+                <strong style="display:block;">${escapeHtml(t.nama)}</strong>
+                <span class="text-muted" style="font-size:0.78rem;">Kandidat Nomor Urut ${noUrut}</span>
+            </td>
+            <td style="text-align:right;">
+                <strong class="result-row-count" style="color:${warna};">${suara}</strong>
+            </td>
+            <td style="text-align:center;">${buildMiniRing(persen, warna)}</td>
         `;
-        container.appendChild(card);
+        tbody.appendChild(tr);
     });
+
+    return table;
+}
+
+/**
+ * Mini lingkaran persentase untuk satu baris tabel hasil perolehan suara.
+ * @param {number} persen Nilai persentase (0-100)
+ * @param {string} warna Warna garis lingkaran
+ * @returns {string} Markup HTML
+ */
+function buildMiniRing(persen, warna) {
+    const RADIUS = 15;
+    const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+    const rasio = Math.max(0, Math.min(100, persen));
+    const panjang = (rasio / 100) * CIRCUMFERENCE;
+
+    return `
+        <span class="result-mini-ring" title="${persen.toFixed(1)}% dari total suara">
+            <svg viewBox="0 0 40 40" aria-hidden="true">
+                <circle cx="20" cy="20" r="${RADIUS}" fill="none" stroke="#e2e8f0" stroke-width="6"></circle>
+                <circle cx="20" cy="20" r="${RADIUS}" fill="none" stroke="${warna}" stroke-width="6"
+                    stroke-dasharray="${panjang.toFixed(3)} ${(CIRCUMFERENCE - panjang).toFixed(3)}"
+                    transform="rotate(-90 20 20)"></circle>
+            </svg>
+            <span class="result-mini-ring-text">${persen.toFixed(1)}%</span>
+        </span>
+    `;
 }
 
 function renderLiveRoomCards(rooms) {

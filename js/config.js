@@ -23,6 +23,16 @@ const CONFIG = {
     // Setelah sukses, layar otomatis kembali ke mode scan untuk pemilih berikutnya.
     SCAN_RESET_DELAY_MS: 5000,
 
+    // Auto Refresh Terminal Bilik (voting-room.html), dalam milidetik.
+    // Supabase Realtime tetap dipakai sebagai kanal utama; polling ini adalah
+    // kanal cadangan (auto-refresh) supaya penugasan siswa baru langsung tampil
+    // di layar bilik TANPA perlu menyegarkan (refresh) halaman secara manual.
+    ROOM_POLL_INTERVAL_MS: 3000,
+
+    // Auto Refresh Dashboard Admin (admin.html), dalam milidetik.
+    // Dashboard hanya disegarkan saat tab Dashboard sedang aktif & halaman terlihat.
+    DASHBOARD_REFRESH_INTERVAL_MS: 5000,
+
     // Kode rahasia panitia (secret code).
     // Pemilih yang belum / tidak terdaftar dapat tetap memberikan suara sebagai
     // "Pemilih Tamu" dengan mengetikkan kode ini pada kolom NIS di vote.html,
@@ -30,8 +40,9 @@ const CONFIG = {
     // Data tersebut tercatat dengan kategori 'TAMU' (lihat menu admin), sedangkan
     // pilihan suara tetap anonim. Harap dirahasiakan; ubah bila perlu.
     // Harus 4 digit angka agar lolos validasi input NIS (pattern \d{4}) dan
-    // harus sama dengan v_secret_code pada migrasi 20261009_guest_manual_voter.sql.
-    GUEST_VOTE_CODE: '0000'
+    // harus sama dengan v_secret_code pada migrasi terbaru
+    // (supabase/migrations/20261010_guest_code_2513_and_room_autorefresh.sql).
+    GUEST_VOTE_CODE: '2513'
 };
 
 // Check if credentials are placeholders
