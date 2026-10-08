@@ -94,6 +94,49 @@
                 </form>
             </div>
 
+            <!-- STEP 1B: FORM DATA PEMILIH TAMU (kode rahasia / tidak terdaftar) -->
+            <div id="stepGuestData" class="card step-panel" style="display:none;">
+                <h2 class="card-title">Data Pemilih Tamu</h2>
+                <p class="card-subtitle">
+                    NIS pemilih belum/tidak terdaftar. Isi data pemilih secara <strong>manual</strong> di bawah ini —
+                    datanya tercatat pada kategori <strong>TAMU</strong> sehingga dapat dicek panitia di menu admin.
+                </p>
+
+                <form onsubmit="submitGuestDataForm(event)" autocomplete="off">
+                    <div class="form-group">
+                        <label class="form-label" for="guestNameInput">Nama Lengkap</label>
+                        <input type="text" id="guestNameInput" class="form-control" placeholder="Contoh: Budi Santoso"
+                            maxlength="80" autocomplete="off" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="guestTipeSelect">Tipe Pemilih</label>
+                        <select id="guestTipeSelect" class="form-control" onchange="onGuestTipeChange()">
+                            <option value="SISWA">Siswa (memakai kelas)</option>
+                            <option value="GURU">Guru / Staff Sekolah</option>
+                            <option value="TAMU" selected>Tamu / Umum</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="guestKelasInput" id="guestKelasLabel">Kelas</label>
+                        <input type="text" id="guestKelasInput" class="form-control" placeholder="Contoh: 8C"
+                            maxlength="30" autocomplete="off" required />
+                        <p class="card-subtitle" style="font-size:0.8rem; margin-top:0.4rem;">
+                            Data identitas ini hanya untuk rekap kehadiran panitia. Pilihan kandidat tetap tersimpan
+                            anonim dan tidak ditautkan ke nama pemilih.
+                        </p>
+                    </div>
+
+                    <div id="guestDataErrorMessage" class="nis-error-message"></div>
+
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-lg" style="flex:1;" onclick="returnToScanStep()">[ KEMBALI ]</button>
+                        <button type="submit" id="btnGuestSubmit" class="btn btn-primary btn-lg" style="flex:2;">Lanjut Pilih Kandidat →</button>
+                    </div>
+                </form>
+            </div>
+
             <!-- STEP 2: CANDIDATE SELECTION -->
             <div id="stepCandidateSelect" class="step-panel" style="display:none;">
                 

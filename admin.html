@@ -100,6 +100,11 @@
                         <span id="statParticipationPct" class="stat-value" style="color:var(--primary-blue);">0%</span>
                         <span class="stat-sub">Tingkat kehadiran</span>
                     </div>
+                    <div class="stat-card">
+                        <span class="stat-title">Pemilih Tamu</span>
+                        <span id="statGuestVoters" class="stat-value" style="color:var(--accent-gold);">0</span>
+                        <span class="stat-sub">Input data manual (kategori TAMU)</span>
+                    </div>
                 </div>
 
                 <!-- Grid Layout: Candidate Tally & Live Bilik Status -->
@@ -143,6 +148,36 @@
                                 </tr>
                             </thead>
                             <tbody id="classBreakdownTbody">
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Rekap Pemilih Tamu (Data Manual via Kode Rahasia) -->
+                <div class="card">
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+                        <div>
+                            <h3 class="card-title">Rekap Pemilih Tamu (Kategori TAMU)</h3>
+                            <p class="card-subtitle">
+                                Pemilih belum/tidak terdaftar yang mengisi data manual memakai kode rahasia. Daftar nama
+                                lengkapnya dapat dicek di tab <strong>👥 Kelola &amp; Impor Siswa</strong> dengan filter
+                                <strong>Kategori: Pemilih Tamu</strong>.
+                            </p>
+                        </div>
+                        <div id="guestVoterSummary" style="font-size:0.9rem; font-weight:700; color:var(--secondary-slate);"></div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Kelas / Keterangan</th>
+                                    <th>Total Pemilih</th>
+                                    <th>Sudah Voting</th>
+                                    <th>Belum Voting</th>
+                                </tr>
+                            </thead>
+                            <tbody id="guestBreakdownTbody">
                                 <!-- Loaded dynamically -->
                             </tbody>
                         </table>
@@ -236,13 +271,19 @@
                     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
                         <div>
                             <h3 class="card-title">Daftar Siswa &amp; Pengecekan Per Kelas</h3>
-                            <p class="card-subtitle">Filter berdasarkan kelas untuk mengecek siapa yang sudah / belum memberikan suara.</p>
+                            <p class="card-subtitle">Filter berdasarkan kategori &amp; kelas untuk mengecek siapa yang sudah / belum memberikan suara. Pemilih tamu (input data manual) tercatat pada kategori <strong>TAMU</strong>.</p>
                         </div>
                         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <select id="studentListKategoriFilter" class="form-control" style="min-width:170px;" onchange="refreshStudentListTable()">
+                                <option value="">-- Semua Kategori --</option>
+                                <option value="SISWA">Siswa Terdaftar</option>
+                                <option value="TAMU">Pemilih Tamu (Manual)</option>
+                            </select>
                             <select id="studentListKelasFilter" class="form-control" style="min-width:160px;" onchange="refreshStudentListTable()">
                                 <option value="">-- Semua Kelas --</option>
                             </select>
                             <input type="text" id="studentListSearch" class="form-control" style="min-width:180px;" placeholder="Cari nama / NIS..." oninput="refreshStudentListTable()" />
+                            <button type="button" class="btn btn-sm btn-danger" onclick="deleteAllGuestVoters()">🗑️ Hapus Semua Pemilih Tamu</button>
                         </div>
                     </div>
                     <div id="studentListSummary" style="margin-bottom:0.75rem; font-size:0.9rem; font-weight:600; color:var(--secondary-slate);"></div>
@@ -266,6 +307,7 @@
                                     <th>NIS</th>
                                     <th>Nama Siswa</th>
                                     <th>Kelas</th>
+                                    <th>Kategori</th>
                                     <th>Status Voting</th>
                                     <th>Aksi</th>
                                 </tr>

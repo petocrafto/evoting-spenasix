@@ -14,6 +14,13 @@
 --   harus menjaga kerahasiaan kode ini. Seluruh suara tamu tetap terhapus
 --   oleh RPC reset (reset_votes_only / reset_total_election) karena tersimpan
 --   pada tabel ballots yang sama.
+--
+-- CATATAN VERSI:
+--   Fungsi submit_vote_guest(p_code, p_candidate_id) di file ini adalah versi
+--   AWAL (tanpa data pemilih). Migrasi 20261009_guest_manual_voter.sql
+--   menggantikannya dengan versi terbaru yang menerima data manual
+--   (nama, kelas/keterangan, tipe pemilih). Jalankan file ini SEBELUM 20261009;
+--   urutan eksekusi: 20261005 -> 20261006 -> 20261007 -> 20261008 -> 20261009.
 
 -- ==========================================
 -- A. Submit Vote via Kode Rahasia / Tamu (Method C)

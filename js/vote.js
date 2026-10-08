@@ -227,6 +227,7 @@ async function stopQrScanner(awaitStop = false) {
 
 function showNisInputStep() {
     document.getElementById('stepNisInput').style.display = 'block';
+    document.getElementById('stepGuestData').style.display = 'none';
     document.getElementById('stepCandidateSelect').style.display = 'none';
     document.getElementById('stepSuccess').style.display = 'none';
 
@@ -291,10 +292,10 @@ async function handleVerifyNis(nis) {
             .single();
 
         if (studentErr || !student) {
-            // Kode rahasia: pemilih yang belum/tidak terdaftar tetap boleh memilih
-            // sebagai "Pemilih Tamu" dengan mengetikkan kode rahasia pada kolom NIS.
+            // Kode rahasia panitia: pemilih yang belum/tidak terdaftar diarahkan ke
+            // form pengisian data MANUAL (nama, tipe, kelas) sebagai "Pemilih Tamu".
             if (nis === getGuestVoteCode()) {
-                await startGuestVoting();
+                openGuestDataStep();
                 return;
             }
 
@@ -352,29 +353,143 @@ function getGuestVoteCode() {
 }
 
 /**
- * Aktifkan mode "Pemilih Tamu": lewati validasi data siswa bagi pemilih yang
- * belum/tidak terdaftar (dikenali dari kode rahasia), lalu lanjut ke pemilihan
- * kandidat. Suara tetap dicatat anonim tanpa identitas.
+ * Aktifkan mode "Pemilih Tamu": tampilkan form pengisian data MANUAL
+ * (nama, tipe pemilih, kelas/keterangan) bagi pemilih yang belum/tidak terdaftar.
+ * Data identitas tercatat server-side dengan kategori 'TAMU', sedangkan pilihan
+ * suara tetap anonim pada tabel ballots.
  */
-async function startGuestVoting() {
+function openGuestDataStep() {
+    currentStudent = null;
+    selectedCandidateId = null;
+
+    const nisInput = document.getElementById('nisInput');
+    if (nisInput) nisInput.value = '';
+
+    resetGuestDataForm();
+    onGuestTipeChange();
+
+    document.getElementById('stepNisInput').style.display = 'none';
+    document.getElementById('stepCandidateSelect').style.display = 'none';
+    document.getElementById('stepSuccess').style.display = 'none';
+    document.getElementById('stepGuestData').style.display = 'block';
+
+    updateVoteStep(1);
+
+    showToast('Mode Pemilih Tamu aktif. Lengkapi data pemilih.', 'info');
+
+    const nameInput = document.getElementById('guestNameInput');
+    if (nameInput) nameInput.focus();
+}
+
+/**
+ * Keterangan bawaan (auto-fill) untuk tiap tipe pemilih tamu.
+ * @param {string} tipe 'SISWA' | 'GURU' | 'TAMU'
+ * @returns {string}
+ */
+function getDefaultGuestKelas(tipe) {
+    if (tipe === 'GURU') return 'GURU / STAFF';
+    if (tipe === 'SISWA') return '';
+    return 'UMUM';
+}
+
+/**
+ * Sinkronkan label, placeholder, dan nilai awal kolom kelas/keterangan
+ * sesuai tipe pemilih yang dipilih.
+ */
+function onGuestTipeChange() {
+    const select = document.getElementById('guestTipeSelect');
+    const kelasInput = document.getElementById('guestKelasInput');
+    const label = document.getElementById('guestKelasLabel');
+    if (!select || !kelasInput) return;
+
+    const tipe = select.value;
+    const previousAuto = kelasInput.dataset.autoValue || '';
+
+    if (label) {
+        label.textContent = tipe === 'SISWA'
+            ? 'Kelas Siswa'
+            : (tipe === 'GURU' ? 'Keterangan Guru / Staff' : 'Keterangan Tamu');
+    }
+
+    kelasInput.placeholder = tipe === 'SISWA' ? 'Contoh: 8C' : 'Contoh: GURU / STAFF';
+
+    // Isi otomatis hanya bila kolom masih kosong atau masih berisi nilai bawaan sebelumnya.
+    if (!kelasInput.value.trim() || kelasInput.value.trim() === previousAuto) {
+        const autoValue = getDefaultGuestKelas(tipe);
+        kelasInput.value = autoValue;
+        kelasInput.dataset.autoValue = autoValue;
+    }
+}
+
+/** Tampilkan / bersihkan pesan error pada form data pemilih tamu. */
+function showGuestDataError(msg) {
+    const errorEl = document.getElementById('guestDataErrorMessage');
+    if (!errorEl) return;
+    errorEl.textContent = msg || '';
+    errorEl.style.display = msg ? 'block' : 'none';
+}
+
+/** Bersihkan seluruh isian form data pemilih tamu. */
+function resetGuestDataForm() {
+    const nameInput = document.getElementById('guestNameInput');
+    const kelasInput = document.getElementById('guestKelasInput');
+
+    if (nameInput) nameInput.value = '';
+    if (kelasInput) {
+        kelasInput.value = '';
+        delete kelasInput.dataset.autoValue;
+    }
+
+    showGuestDataError('');
+}
+
+/**
+ * Validasi data manual pemilih tamu, lalu lanjut ke langkah pemilihan kandidat.
+ * Data dikirim ke server saat konfirmasi suara (RPC submit_vote_guest).
+ */
+async function submitGuestDataForm(event) {
+    if (event) event.preventDefault();
+
+    const nameInput = document.getElementById('guestNameInput');
+    const kelasInput = document.getElementById('guestKelasInput');
+    const tipeSelect = document.getElementById('guestTipeSelect');
+
+    const nama = (nameInput ? nameInput.value : '').trim();
+    const tipe = tipeSelect ? tipeSelect.value : 'TAMU';
+    const kelas = (kelasInput ? kelasInput.value : '').trim();
+
+    if (nama.length < 3) {
+        showGuestDataError('Nama lengkap minimal 3 karakter.');
+        showToast('Nama pemilih tamu minimal 3 karakter.', 'error');
+        return;
+    }
+
+    if (tipe === 'SISWA' && !kelas) {
+        showGuestDataError('Kelas wajib diisi untuk tipe pemilih Siswa.');
+        showToast('Kelas wajib diisi untuk tipe pemilih Siswa.', 'error');
+        return;
+    }
+
+    showGuestDataError('');
+
+    // Data manual pemilih tamu dicatat server-side dengan kategori 'TAMU'.
     currentStudent = {
         isGuest: true,
-        nis: getGuestVoteCode(),
-        nama: 'Pemilih Tamu',
-        kelas: 'Tidak Terdaftar'
+        nis: null,
+        nama: nama,
+        tipe: tipe,
+        kelas: kelas
     };
 
-    showToast('Mode Pemilih Tamu aktif.', 'info');
-
     // Render info pemilih tamu pada banner verifikasi
-    document.getElementById('displayStudentName').textContent = currentStudent.nama;
-    document.getElementById('displayStudentKelas').textContent = ` (${currentStudent.kelas})`;
+    document.getElementById('displayStudentName').textContent = nama;
+    document.getElementById('displayStudentKelas').textContent = ` (Tamu${kelas ? ' - ' + kelas : ''})`;
     document.getElementById('displayStudentNis').textContent = 'TAMU';
 
     // Muat kandidat aktif
     await loadCandidates();
 
-    document.getElementById('stepNisInput').style.display = 'none';
+    document.getElementById('stepGuestData').style.display = 'none';
     document.getElementById('stepCandidateSelect').style.display = 'block';
 
     updateVoteStep(2);
@@ -474,12 +589,15 @@ async function confirmVoteSubmission() {
     if (confirmBtn) confirmBtn.disabled = true;
 
     try {
-        // Pemilih tamu memakai RPC khusus (validasi kode rahasia di server),
-        // sedangkan siswa terdaftar memakai RPC QR/NIS biasa.
+        // Pemilih tamu memakai RPC khusus (validasi kode di server + data manual
+        // nama/tipe/kelas), sedangkan siswa terdaftar memakai RPC QR/NIS biasa.
         const response = currentStudent.isGuest
             ? await callRpc('submit_vote_guest', {
                 p_code: getGuestVoteCode(),
-                p_candidate_id: selectedCandidateId
+                p_candidate_id: selectedCandidateId,
+                p_nama: currentStudent.nama,
+                p_kelas: currentStudent.kelas,
+                p_tipe: currentStudent.tipe
             })
             : await callRpc('submit_vote_qr', {
                 p_nis: currentStudent.nis,
@@ -556,8 +674,14 @@ function returnToScanStep() {
     selectedCandidateId = null;
     activeCandidates = [];
 
+    // Bersihkan form data pemilih tamu (bila sebelumnya memakai kode rahasia)
+    resetGuestDataForm();
+
     const grid = document.getElementById('candidateGridContainer');
     if (grid) grid.innerHTML = '';
+
+    const guestPanel = document.getElementById('stepGuestData');
+    if (guestPanel) guestPanel.style.display = 'none';
 
     const nisInput = document.getElementById('nisInput');
     if (nisInput) nisInput.value = '';

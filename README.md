@@ -64,7 +64,11 @@ Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, be
 │
 ├── supabase/
 │   ├── migrations/
-│   │   └── 20261005_initial_schema.sql  # Schema, RLS & Stored Procedures (RPC)
+│   │   ├── 20261005_initial_schema.sql        # Schema, RLS & Stored Procedures (RPC)
+│   │   ├── 20261006_room_vote_management.sql  # RPC manajemen bilik & reset suara
+│   │   ├── 20261007_bulk_delete.sql           # RPC hapus massal siswa & kandidat
+│   │   ├── 20261008_guest_vote.sql            # RPC kode rahasia pemilih tamu
+│   │   └── 20261009_guest_manual_voter.sql    # Kategori TAMU & data manual pemilih tamu
 │   └── seed.sql             # Data kandidat awal, bilik & contoh siswa
 │
 ├── .env.example             # Template variabel lingkungan
@@ -158,7 +162,8 @@ cd evoting-spenasix-divisi9
 3. Skrip ini akan membuat tabel (`students`, `candidates`, `ballots`, `election_settings`, `voting_rooms`, `voting_sessions`, `audit_logs`), mengaktifkan RLS, serta memasang fungsi RPC atomik (`submit_vote_qr`, `submit_vote_room`, `activate_room`, `assign_student_to_room`, `get_admin_dashboard_stats`).
 4. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261006_room_vote_management.sql`.** File ini menambahkan RPC manajemen bilik: `deactivate_room` (Keluar Mode Bilik dari terminal), `delete_voting_room` (Hapus bilik dari daftar), dan `reset_votes_only` (Reset seluruh suara tanpa mematikan perangkat bilik).
 5. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261007_bulk_delete.sql`.** File ini menambahkan RPC **hapus massal (multi-select)** pada tab Kelola Siswa & Kelola Kandidat: `delete_students_batch` (Hapus banyak siswa sekaligus, sesi voting ikut terhapus via CASCADE) dan `delete_candidates_batch` (Hapus banyak kandidat sekaligus dengan validasi tidak boleh menghapus kandidat yang sudah punya suara).
-6. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261008_guest_vote.sql`.** File ini menambahkan RPC **`submit_vote_guest`** — **kode rahasia** panitia (default **`0000`**) yang memungkinkan pemilih **belum/tidak terdaftar** tetap memberikan suara sebagai **Tamu** pada halaman Voting ID Card (`vote.html`). Suara tamu dicatat **anonim** tanpa identitas (hanya tersimpan pada tabel `ballots`).
+6. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261008_guest_vote.sql`.** File ini menambahkan RPC **`submit_vote_guest`** — **kode rahasia** panitia (default **`0000`**) yang memungkinkan pemilih **belum/tidak terdaftar** tetap memberikan suara sebagai **Tamu** pada halaman Voting ID Card (`vote.html`).
+7. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261009_guest_manual_voter.sql`.** File ini **menyempurnakan alur Pemilih Tamu** menjadi **pengisian data manual**: saat kode rahasia (`0000`) diketik pada kolom NIS, pemilih mengisi **Nama Lengkap + Tipe Pemilih (Siswa / Guru / Tamu) + Kelas atau Keterangan**, yaitu cara pengisian data yang sama seperti data siswa namun diketik manual. Datanya disimpan pada tabel `students` dengan **kategori `TAMU`** (kolom baru `kategori`, `nis` NULL, `kelas` berprefiks `TAMU - `), sehingga tampil sebagai **kategori tersendiri** di menu admin; pilihan suara tetap **anonim** pada tabel `ballots`. File ini juga memperbarui `get_admin_dashboard_stats()` agar statistik siswa terdaftar tidak tercampur dengan pemilih tamu.
 
 ### 4. Eksekusi Seed Data Awal
 1. Di SQL Editor Supabase, salin dan jalankan isi file `supabase/seed.sql`.
@@ -175,7 +180,8 @@ Beberapa error umum saat menjalankan migrasi beserta solusinya:
 
 - **`42710: policy "..." already exists`** — Terjadi bila `20261005` dijalankan ulang. File sudah dibuat idempotent (`DROP POLICY IF EXISTS` sebelum setiap `CREATE POLICY`), jadi cukup jalankan ulang seluruh file dari awal.
 - **`DELETE requires a WHERE clause` / `UPDATE requires a WHERE clause`** — Muncul saat memakai tombol **Reset Suara Saja** / **Reset Total**. Ini berasal dari guard extension **`pg_safeupdate`** milik Supabase yang menolak `DELETE`/`UPDATE` tanpa `WHERE`, termasuk di dalam fungsi `SECURITY DEFINER`. Fungsi `reset_votes_only()`, `reset_all_rooms()`, dan `reset_total_election()` sudah diberi `WHERE TRUE` agar lolos guard. **Jalankan ulang** `20261005_initial_schema.sql` dan `20261006_room_vote_management.sql` agar fungsi ter-`CREATE OR REPLACE` dengan versi terbaru.
-- **`function public.xxx() does not exist` / `PGRST202`** — Fungsi RPC belum terpasang karena migrasi yang mendefinisikannya belum dijalankan (atau berhenti di tengah karena error). Jalankan migrasi sesuai urutan `20261005` → `20261006` → `20261007` → `20261008`.
+- **`function public.xxx() does not exist` / `PGRST202`** — Fungsi RPC belum terpasang karena migrasi yang mendefinisikannya belum dijalankan (atau berhenti di tengah karena error). Jalankan migrasi sesuai urutan `20261005` → `20261006` → `20261007` → `20261008` → `20261009`.
+- **`column students.kategori does not exist`** (atau gagal menyimpan pemilih tamu) — Migrasi `20261009_guest_manual_voter.sql` belum dijalankan. Fitur **Pemilih Tamu (input data manual)** membutuhkan kolom `kategori` serta kolom `nis` yang boleh NULL, jadi jalankan file migrasi tersebut di SQL Editor dan tunggu ±10 detik hingga skema PostgREST tersegarkan.
 - **`could not find the function ... in the schema cache`** — PostgREST sedang menyegarkan cache skema. Tunggu ±10 detik lalu ulangi; jika tetap muncul, gunakan tombol *Reload schema cache* pada Supabase Dashboard → *Settings* → *API*.
 
 ---
@@ -194,7 +200,16 @@ Beberapa error umum saat menjalankan migrasi beserta solusinya:
 4. Sistem membaca NIS 4-digit secara otomatis, menutup kamera, dan **langsung menampilkan 1 Halaman Surat Suara Kandidat**.
 5. Siswa memilih kandidat, meninjau modal konfirmasi, dan menekan **[ KONFIRMASI SUARA ]**.
 6. Setelah suara tercatat, layar menampilkan **"SUARA BERHASIL TERCATAT"** beserta **hitung mundur ±5 detik**, lalu **otomatis kembali ke langkah Verifikasi/Scan** sehingga pemilih berikutnya dapat langsung scan tanpa memuat ulang halaman. Tersedia pula tombol **📷 Scan Siswa Berikutnya** (kembali seketika) dan **☰ Kembali ke Menu** (ke portal). Durasi hitung mundur dapat diubah lewat `SCAN_RESET_DELAY_MS` pada `js/config.js`.
-7. **Kode Rahasia untuk Pemilih Belum/Tidak Terdaftar (Tamu).** Bila NIS pemilih tidak ditemukan di basis data, panitia dapat meminta pemilih mengetikkan **kode rahasia** (default **`0000`**) pada kolom *Masukkan NIS 4 Digit*. Sistem akan melewati validasi data siswa dan pemilih lanjut memilih sebagai **"Pemilih Tamu"**; suara tetap tersimpan **anonim**. Kode dapat diubah pada `GUEST_VOTE_CODE` di `js/config.js` **dan harus sama** dengan `v_secret_code` di dalam fungsi `submit_vote_guest` pada `supabase/migrations/20261008_guest_vote.sql` (validasi dilakukan di sisi server).
+7. **Kode Rahasia untuk Pemilih Belum/Tidak Terdaftar (Pemilih Tamu — Input Data Manual).** Bila NIS pemilih tidak ditemukan di basis data, panitia dapat meminta pemilih mengetikkan **kode rahasia** (default **`0000`**) pada kolom *Masukkan NIS 4 Digit*. Sistem menampilkan **form data pemilih tamu** dengan isian:
+   - **Nama Lengkap** (wajib, minimal 3 karakter),
+   - **Tipe Pemilih**: `Siswa (memakai kelas)`, `Guru / Staff Sekolah`, atau `Tamu / Umum` (mengisi keterangan secara otomatis, tetap dapat diubah),
+   - **Kelas / Keterangan** (mis. `8C`, `GURU / STAFF`, `UMUM`).
+
+   Setelah data diisi, pemilih memilih kandidat seperti biasa. Datanya tercatat sebagai **kategori `TAMU`** (`nis` NULL, `kelas` berprefiks `TAMU - `) sehingga **terpisah** dari siswa terdaftar dan **tidak** mengubah rekap per kelas siswa; pilihan suara tetap **anonim** di tabel `ballots`. Cek hasilnya di `admin.html`:
+   - Tab **📊 Dashboard** → kartu **Pemilih Tamu** + tabel **Rekap Pemilih Tamu (Kategori TAMU)**.
+   - Tab **👥 Kelola & Impor Siswa** → filter **Kategori: Pemilih Tamu (Manual)** untuk melihat/ menghapus daftar nama pemilih tamu, atau tombol **🗑️ Hapus Semua Pemilih Tamu**.
+
+   Kode dapat diubah pada `GUEST_VOTE_CODE` di `js/config.js` **dan harus sama** dengan `v_secret_code` di dalam fungsi `submit_vote_guest` pada file migrasi **terbaru** (`supabase/migrations/20261009_guest_manual_voter.sql`); validasi dilakukan di sisi server. Satu pemilih tamu (nama + kelas/keterangan sama) hanya dapat memberikan suara **1 kali**.
 
 ### 3. Mengaktifkan Komputer Bilik Voting (Metode B)
 1. Di setiap komputer bilik, buka URL `/voting-room.html`.
@@ -222,8 +237,8 @@ Beberapa error umum saat menjalankan migrasi beserta solusinya:
    Fungsi database `submit_vote_qr` dan `submit_vote_room` menggunakan perintah `FOR UPDATE` (row lock) dan transaksi atomik. Jika ada 2 request bersamaan untuk 1 NIS yang sama, request pertama akan `SUCCESS` dan request kedua otomatis `REJECTED`.
 3. **Pemberhentian Akses Hasil untuk Siswa:**
    Row Level Security (RLS) melarang role anonim/siswa melakukan query pada tabel `ballots` atau agregat kandidat. Hasil suara kandidat hanya tersedia untuk admin terotentikasi.
-4. **Kode Rahasia Pemilih Tamu (Guest):**
-   RPC `submit_vote_guest` memvalidasi kode rahasia **di sisi server** (bukan hanya di klien), sehingga hanya pemegang kode yang dapat memicu pencatatan suara tamu. Suara tamu disimpan **sepenuhnya anonim** pada tabel `ballots` (tanpa entri pada tabel `students`, tanpa `student_id`). Karena satu kode dapat dipakai berkali-kali oleh pemilih berbeda, **panitia wajib menjaga kerahasiaan kode ini**; seluruh suara tamu tetap terhapus oleh Reset Suara/Reset Total.
+4. **Kode Rahasia Pemilih Tamu (Input Data Manual):**
+   RPC `submit_vote_guest` memvalidasi kode rahasia **di sisi server** (bukan hanya di klien), sehingga hanya pemegang kode yang dapat memicu pencatatan pemilih tamu. Berbeda dari alur QR/NIS, pemilih tamu **mengisi data sendiri secara manual** (nama, tipe, kelas/keterangan). Data identitas tersebut disimpan pada tabel `students` dengan **kategori `TAMU`** (`nis` NULL, `kelas` berprefiks `TAMU - `) sehingga terpisah dari data siswa terdaftar, sementara **pilihan suara tetap anonim** pada tabel `ballots` (tanpa `student_id`) dan `audit_logs` **tidak** mencatat nama pemilih — jadi panitia bisa tahu *siapa saja* yang masuk kategori tamu, tetapi **tidak bisa** menghubungkan nama tersebut dengan kandidat yang dipilih. Satu pemilih tamu dengan nama & kelas/keterangan yang sama hanya dapat voting **1 kali** (validasi + row lock `pg_advisory_xact_lock`). Karena satu kode dapat dipakai berkali-kali oleh pemilih berbeda, **panitia wajib menjaga kerahasiaan kode ini**; seluruh suara tamu tetap terhapus oleh Reset Suara/Reset Total, dan daftar pemilih tamu dapat dihapus dari tab **Kelola & Impor Siswa**.
 
 ---
 

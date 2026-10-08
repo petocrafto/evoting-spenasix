@@ -25,9 +25,12 @@ const CONFIG = {
 
     // Kode rahasia panitia (secret code).
     // Pemilih yang belum / tidak terdaftar dapat tetap memberikan suara sebagai
-    // "Pemilih Tamu" dengan mengetikkan kode ini pada kolom NIS di vote.html.
-    // Harap dirahasiakan; ubah bila perlu. Harus 4 digit angka agar lolos
-    // validasi input NIS (pattern \d{4}).
+    // "Pemilih Tamu" dengan mengetikkan kode ini pada kolom NIS di vote.html,
+    // lalu mengisi data secara MANUAL (nama + tipe pemilih + kelas/keterangan).
+    // Data tersebut tercatat dengan kategori 'TAMU' (lihat menu admin), sedangkan
+    // pilihan suara tetap anonim. Harap dirahasiakan; ubah bila perlu.
+    // Harus 4 digit angka agar lolos validasi input NIS (pattern \d{4}) dan
+    // harus sama dengan v_secret_code pada migrasi 20261009_guest_manual_voter.sql.
     GUEST_VOTE_CODE: '0000'
 };
 

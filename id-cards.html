@@ -190,7 +190,9 @@
             try {
                 const client = getSupabaseClient();
                 if (client) {
-                    let q = client.from('students').select('*').order('kelas').order('nama');
+                    // Hanya siswa terdaftar (punya NIS) yang boleh dicetak kartu QR -nya.
+                    // Pemilih tamu (kategori TAMU) tidak memiliki NIS sehingga dikecualikan.
+                    let q = client.from('students').select('*').not('nis', 'is', null).order('kelas').order('nama');
                     if (filterKelas !== 'ALL') q = q.eq('kelas', filterKelas);
                     const { data: dbStudents } = await q;
                     if (dbStudents && dbStudents.length > 0) {

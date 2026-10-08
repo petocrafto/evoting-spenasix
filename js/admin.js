@@ -140,6 +140,10 @@ async function loadDashboardStats() {
         document.getElementById('statNotVotedStudents').textContent = stats.not_voted_students || 0;
         document.getElementById('statParticipationPct').textContent = `${stats.participation_pct || 0}%`;
 
+        // Statistik Pemilih Tamu (kategori TAMU — pengisian data manual)
+        const guestStatEl = document.getElementById('statGuestVoters');
+        if (guestStatEl) guestStatEl.textContent = stats.guest_voted || 0;
+
         // Election Status Badge
         const statusBadge = document.getElementById('displayElectionStatusBadge');
         if (statusBadge) {
@@ -149,6 +153,9 @@ async function loadDashboardStats() {
 
         // Render Class Breakdown Table
         renderClassBreakdownTable(stats.class_stats);
+
+        // Render Rekap Pemilih Tamu (kategori TAMU — input data manual)
+        renderGuestBreakdownTable(stats.guest_stats, stats.guest_total, stats.guest_voted);
 
         // Render Aggregate Candidate Results (ADMIN ONLY)
         renderCandidateTallyCards(stats.candidate_tally);
@@ -179,6 +186,42 @@ function renderClassBreakdownTable(classStats) {
             <td>${c.total}</td>
             <td><span class="badge badge-voted">${c.voted} Sudah</span></td>
             <td><span class="badge badge-not-voted">${c.not_voted} Belum (${pct}%)</span></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+/**
+ * Render rekap pemilih tamu (kategori 'TAMU'): pemilih belum/tidak terdaftar
+ * yang mengisi data manual memakai kode rahasia pada halaman vote.html.
+ * @param {Array} guestStats Rekap per kelas/keterangan
+ * @param {number} guestTotal Total pemilih tamu tercatat
+ * @param {number} guestVoted Jumlah pemilih tamu yang sudah memberikan suara
+ */
+function renderGuestBreakdownTable(guestStats, guestTotal, guestVoted) {
+    const tbody = document.getElementById('guestBreakdownTbody');
+    const summaryEl = document.getElementById('guestVoterSummary');
+
+    if (summaryEl) {
+        summaryEl.textContent = `Total Pemilih Tamu: ${guestTotal || 0} • Sudah Voting: ${guestVoted || 0}`;
+    }
+
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!guestStats || guestStats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Belum ada pemilih tamu (data manual).</td></tr>';
+        return;
+    }
+
+    guestStats.forEach(g => {
+        const pct = g.total > 0 ? Math.round((g.voted / g.total) * 100) : 0;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${escapeHtml(g.kelas)}</strong></td>
+            <td>${g.total}</td>
+            <td><span class="badge badge-voted">${g.voted} Sudah</span></td>
+            <td><span class="badge badge-not-voted">${g.not_voted} Belum (${pct}%)</span></td>
         `;
         tbody.appendChild(tr);
     });
@@ -245,8 +288,11 @@ function renderLiveRoomCards(rooms) {
 async function loadAssignBilikPanel() {
     const client = getSupabaseClient();
 
-    // Populate Kelas Dropdown
-    const { data: students } = await client.from('students').select('kelas');
+    // Populate Kelas Dropdown (hanya siswa terdaftar — pemilih tamu tidak dapat ditugaskan ke bilik)
+    const { data: students } = await client
+        .from('students')
+        .select('kelas')
+        .not('nis', 'is', null);
     if (students) {
         const uniqueClasses = [...new Set(students.map(s => s.kelas))].sort();
         const select = document.getElementById('assignSelectKelas');
@@ -279,7 +325,13 @@ async function filterAssignStudentList() {
     const kelasFilter = document.getElementById('assignSelectKelas').value;
     const searchFilter = document.getElementById('assignSearchStudent').value.trim();
 
-    let query = client.from('students').select('*').order('nama', { ascending: true }).limit(50);
+    // Hanya siswa terdaftar (punya NIS) yang dapat ditugaskan ke bilik voting
+    let query = client
+        .from('students')
+        .select('*')
+        .not('nis', 'is', null)
+        .order('nama', { ascending: true })
+        .limit(50);
 
     if (kelasFilter) query = query.eq('kelas', kelasFilter);
     if (searchFilter) query = query.or(`nama.ilike.%${searchFilter}%,nis.ilike.%${searchFilter}%`);
@@ -410,7 +462,11 @@ async function loadStudentsTab() {
 
 async function populateStudentClassFilter() {
     const client = getSupabaseClient();
-    const { data: students } = await client.from('students').select('kelas');
+    // Hanya siswa terdaftar yang memiliki NIS (pemilih tamu dikecualikan)
+    const { data: students } = await client
+        .from('students')
+        .select('kelas')
+        .not('nis', 'is', null);
 
     const select = document.getElementById('studentListKelasFilter');
     if (!select) return;
@@ -426,27 +482,35 @@ async function populateStudentClassFilter() {
     if (previous) select.value = previous;
 }
 
-function updateStudentListSummary(total, voted, notVoted, kelasFilter) {
+function updateStudentListSummary(total, voted, notVoted, kelasFilter, kategoriFilter = '') {
     const summaryEl = document.getElementById('studentListSummary');
     if (!summaryEl) return;
 
     if (total === 0) {
-        summaryEl.textContent = kelasFilter
-            ? `Tidak ada siswa pada kelas ${kelasFilter}.`
-            : 'Belum ada data siswa terdaftar.';
+        summaryEl.textContent = (kelasFilter || kategoriFilter)
+            ? 'Tidak ada data pemilih pada filter yang dipilih.'
+            : 'Belum ada data pemilih terdaftar.';
         return;
     }
 
-    const scope = kelasFilter ? `Kelas ${kelasFilter}` : 'Semua Kelas';
-    summaryEl.textContent = `${scope} — Total: ${total} siswa • Sudah Voting: ${voted} • Belum Voting: ${notVoted}`;
+    const scopeParts = [];
+    if (kategoriFilter) {
+        scopeParts.push(kategoriFilter === 'TAMU' ? 'Pemilih Tamu (Manual)' : 'Siswa Terdaftar');
+    }
+    if (kelasFilter) scopeParts.push(`Kelas ${kelasFilter}`);
+
+    const scope = scopeParts.length > 0 ? scopeParts.join(' • ') : 'Semua Kategori';
+    summaryEl.textContent = `${scope} — Total: ${total} pemilih • Sudah Voting: ${voted} • Belum Voting: ${notVoted}`;
 }
 
 async function refreshStudentListTable() {
     const client = getSupabaseClient();
 
     const filterEl = document.getElementById('studentListKelasFilter');
+    const kategoriEl = document.getElementById('studentListKategoriFilter');
     const searchEl = document.getElementById('studentListSearch');
     const kelasFilter = filterEl ? filterEl.value : '';
+    const kategoriFilter = kategoriEl ? kategoriEl.value : '';
     const searchFilter = searchEl ? searchEl.value.trim() : '';
 
     let query = client
@@ -455,6 +519,8 @@ async function refreshStudentListTable() {
         .order('kelas', { ascending: true })
         .order('nama', { ascending: true });
 
+    // Filter kategori: 'SISWA' (terdaftar) atau 'TAMU' (pemilih tamu / input manual)
+    if (kategoriFilter) query = query.eq('kategori', kategoriFilter);
     if (kelasFilter) query = query.eq('kelas', kelasFilter);
     if (searchFilter) query = query.or(`nama.ilike.%${searchFilter}%,nis.ilike.%${searchFilter}%`);
 
@@ -467,14 +533,15 @@ async function refreshStudentListTable() {
     tbody.innerHTML = '';
 
     if (error) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Gagal memuat data siswa.</td></tr>';
+        console.error('Error loading student list:', error);
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Gagal memuat data pemilih.</td></tr>';
         syncStudentSelectionUI();
         return;
     }
 
     if (!students || students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Belum ada data siswa terdaftar.</td></tr>';
-        updateStudentListSummary(0, 0, 0, kelasFilter);
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Belum ada data pemilih terdaftar.</td></tr>';
+        updateStudentListSummary(0, 0, 0, kelasFilter, kategoriFilter);
         syncStudentSelectionUI();
         return;
     }
@@ -483,14 +550,16 @@ async function refreshStudentListTable() {
 
     students.forEach(s => {
         const isVoted = s.has_voted || s.voting_status === 'VOTED';
+        const isGuest = s.kategori === 'TAMU';
         if (isVoted) votedCount++;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><input type="checkbox" class="student-row-checkbox" data-id="${s.id}" onclick="toggleStudentSelection('${s.id}', this.checked)" /></td>
-            <td><strong>${escapeHtml(s.nis)}</strong></td>
+            <td><strong>${escapeHtml(s.nis || 'TAMU')}</strong></td>
             <td>${escapeHtml(s.nama)}</td>
             <td>${escapeHtml(s.kelas)}</td>
+            <td><span class="badge badge-${isGuest ? 'waiting' : 'ready'}">${isGuest ? 'TAMU' : 'SISWA'}</span></td>
             <td><span class="badge badge-${isVoted ? 'voted' : 'not-voted'}">${s.voting_status}</span></td>
             <td>
                 <button type="button" class="btn btn-sm btn-secondary" onclick="deleteStudent('${s.id}', '${escapeHtml(s.nama)}')">Hapus</button>
@@ -502,7 +571,7 @@ async function refreshStudentListTable() {
     // Simpan jumlah baris yang tampil untuk sinkronisasi checkbox "pilih semua"
     tbody.dataset.rowCount = String(students.length);
 
-    updateStudentListSummary(students.length, votedCount, students.length - votedCount, kelasFilter);
+    updateStudentListSummary(students.length, votedCount, students.length - votedCount, kelasFilter, kategoriFilter);
     syncStudentSelectionUI();
 }
 
@@ -581,6 +650,46 @@ async function deleteSelectedStudents() {
         showToast(describeRpcError(err, 'Terjadi kesalahan saat menghapus data siswa.'), 'error');
     } finally {
         if (btn) btn.disabled = false;
+    }
+}
+
+/**
+ * Hapus SELURUH data pemilih tamu (kategori 'TAMU') dalam satu tindakan.
+ * Berguna untuk membersihkan data uji coba sebelum hari pemilihan.
+ */
+async function deleteAllGuestVoters() {
+    const client = getSupabaseClient();
+
+    try {
+        const { data: guests, error } = await client
+            .from('students')
+            .select('id')
+            .eq('kategori', 'TAMU');
+
+        if (error) {
+            console.error('Load guest voters error:', error);
+            showToast('Gagal memuat data pemilih tamu. Pastikan migrasi 20261009 sudah dijalankan.', 'error');
+            return;
+        }
+
+        if (!guests || guests.length === 0) {
+            showToast('Belum ada data pemilih tamu yang tercatat.', 'info');
+            return;
+        }
+
+        if (!confirm(`Hapus SELURUH ${guests.length} data pemilih tamu (kategori TAMU)?\n\nSuara yang sudah masuk tidak ikut terhapus — gunakan Reset Suara pada tab Pengaturan Election bila ingin mengosongkan hasil.`)) return;
+
+        const res = await callRpc('delete_students_batch', { p_ids: guests.map(g => g.id) });
+        if (res && res.success) {
+            showToast(res.message || 'Seluruh data pemilih tamu berhasil dihapus.', 'success');
+            loadStudentsTab();
+            loadDashboardStats();
+        } else {
+            showToast((res && res.message) || 'Gagal menghapus data pemilih tamu.', 'error');
+        }
+    } catch (err) {
+        console.error('Delete guest voters error:', err);
+        showToast(describeRpcError(err, 'Terjadi kesalahan saat menghapus data pemilih tamu.'), 'error');
     }
 }
 
@@ -1163,7 +1272,7 @@ function describeRpcError(err, fallback) {
     const code = err.code || '';
     // 42883 = undefined_function, PGRST202 = function tidak ditemukan di schema cache PostgREST
     if (code === '42883' || code === 'PGRST202' || /does not exist|could not find the function|schema cache/i.test(raw)) {
-        return `Fungsi database belum terpasang di Supabase (${raw}). Jalankan migrasi terbaru (20261005 -> 20261006 -> 20261007 -> 20261008) di Supabase SQL Editor.`;
+        return `Fungsi database belum terpasang di Supabase (${raw}). Jalankan migrasi terbaru (20261005 -> 20261006 -> 20261007 -> 20261008 -> 20261009) di Supabase SQL Editor.`;
     }
     return `${fallback} (${raw})`;
 }
