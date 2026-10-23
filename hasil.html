@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hasil Pemilihan OSIS Candra Kirana Angkatan 35 – SPENASIX</title>
+<link rel="stylesheet" href="css/hasil.css">
+<link rel="stylesheet" href="css/animations.css">
+</head>
+<body class="hasil-page">
+
+<!-- ═══ CONTROL PANEL ═══ -->
+<div id="controlPanel">
+  <div class="cp-header">
+    <div class="cp-title">🎬 Panel Pengumuman Hasil</div>
+    <div class="cp-subtitle">OSIS Candra Kirana &bull; Angkatan 35 &bull; Periode 2026-2027 &bull; SPENASIX</div>
+  </div>
+  <div class="cp-tabs">
+    <button class="cp-tab active" data-tab="tabSound">🔊 Suara</button>
+    <button class="cp-tab" data-tab="tabPengumuman">🎬 Pengumuman</button>
+    <button class="cp-tab" data-tab="tabKandidat">👥 Kandidat</button>
+  </div>
+
+  <div id="tabSound" class="cp-tabcontent active">
+    <div class="sound-master-row">
+      <label class="cp-label">Master Volume</label>
+      <input type="range" id="masterVolume" min="0" max="1" step="0.05" value="0.8" class="vol-slider">
+      <button class="btn-cp btn-cp-sm" onclick="toggleMute()">Mute</button>
+      <button class="btn-cp btn-cp-sm" onclick="reloadSoundList()">Muat Ulang</button>
+      <span id="soundStatusMsg" class="cp-status-msg"></span>
+    </div>
+    <div id="soundSlots" class="sound-slots"></div>
+    <div id="soundPreloadStatus" class="sound-preload-status"></div>
+  </div>
+
+  <div id="tabPengumuman" class="cp-tabcontent">
+    <div class="logo-upload-section">
+      <label class="cp-label">Logo OSIS/Sekolah (opsional)</label>
+      <div class="logo-upload-row">
+        <input type="file" id="logoUpload" accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
+        <button class="btn-cp" onclick="document.getElementById('logoUpload').click()">Pilih Gambar</button>
+        <button class="btn-cp btn-cp-danger" onclick="clearLogo()">Hapus Logo</button>
+        <span id="logoStatus" class="cp-status-msg"></span>
+      </div>
+      <div id="logoPreview" class="logo-preview-wrap"></div>
+    </div>
+    <div id="zeroVoteWarning" class="zero-vote-warn" style="display:none">
+      ⚠️ Total suara masih 0. Pastikan pemilihan sudah selesai sebelum pengumuman.
+    </div>
+    <div class="start-btn-row">
+      <button id="btnMulai" class="btn-cp btn-cp-gold btn-cp-lg" onclick="startPengumuman()">
+        🎬 Mulai Pengumuman (Fullscreen Otomatis)
+      </button>
+      <p class="cp-hint">
+        Opening → Perkenalan → Hitung Suara → Reveal Urutan berjalan <strong>otomatis</strong>.<br>
+        Setelah hitungan selesai, tekan <kbd style="background:rgba(212,175,55,.2);padding:1px 6px;border-radius:4px;border:1px solid var(--gold);color:var(--gold)">SPASI</kbd>
+        untuk mengungkap urutan satu per satu. ESC untuk keluar fullscreen.
+      </p>
+    </div>
+  </div>
+
+  <div id="tabKandidat" class="cp-tabcontent">
+    <p class="cp-hint" style="margin-bottom:.75rem">Foto pasangan diisi via admin panel. Preview kandidat di bawah:</p>
+    <div id="kandidatPreviewList" class="kandidat-preview-list">
+      <p style="color:var(--brown-light)">Memuat data kandidat...</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STAGE FULLSCREEN ═══ -->
+<div id="hasilStage">
+  <canvas id="fireworkCanvas"></canvas>
+
+  <!-- 0. LOADING -->
+  <div id="screenLoading" class="hscreen active">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Memuat data pemilihan...</div>
+    <div id="loadingError" class="loading-error" style="display:none"></div>
+  </div>
+
+  <!-- 1. OPENING -->
+  <div id="screenOpening" class="hscreen screen-opening">
+    <div class="opening-particle-ring" id="particleRing"></div>
+    <div id="openingLogoWrap" class="opening-logo-wrap"></div>
+    <div class="opening-eyebrow">✦ PENGUMUMAN RESMI ✦</div>
+    <div class="opening-title">HASIL PEMILIHAN</div>
+    <div class="opening-subtitle">KETUA &amp; WAKIL KETUA OSIS</div>
+    <div class="opening-org-badge">
+      <span>CANDRA KIRANA</span>
+      <span class="badge-sep">◆</span>
+      <span>ANGKATAN 35</span>
+      <span class="badge-sep">◆</span>
+      <span>PERIODE 2026–2027</span>
+      <span class="badge-sep">◆</span>
+      <span>SPENASIX</span>
+    </div>
+    <div class="opening-divider"></div>
+    <span id="openingTypewriter" class="opening-typewriter"></span>
+  </div>
+
+  <!-- 2. PERKENALAN PASLON -->
+  <div id="screenPerkenalan" class="hscreen">
+    <div class="screen-badge-row"><span class="screen-badge">✦ PASANGAN CALON ✦</span></div>
+    <div class="screen-big-title">DAFTAR PASLON</div>
+    <div class="perk-subtitle">Selamat datang kepada seluruh pasangan calon yang telah berjuang dengan penuh semangat dan dedikasi</div>
+    <div id="perkenalanCards" class="perkenalan-cards"></div>
+  </div>
+
+  <!-- 3. KETEGANGAN -->
+  <div id="screenKetegangan" class="hscreen screen-ket">
+    <div class="ket-eyebrow">⚡ PROSES PENGHITUNGAN ⚡</div>
+    <div class="ketegangan-label">MENGHITUNG SUARA MASUK...</div>
+    <div class="ket-number-wrap">
+      <div class="ketegangan-number" id="ketNumberEl">0</div>
+      <div class="ket-unit">suara</div>
+    </div>
+    <div class="ketegangan-total" id="ketTotalEl">dari 0 suara sah</div>
+    <div class="ket-bar-wrap">
+      <div class="ket-bar-fill" id="ketBarFill"></div>
+      <div class="ket-bar-glow" id="ketBarGlow"></div>
+    </div>
+    <div class="ketegangan-pct" id="ketPctEl">0%</div>
+    <div class="space-hint" id="ketSpaceHint">Tekan <kbd>SPASI</kbd> untuk mulai pengumuman urutan</div>
+  </div>
+
+  <!-- 4. REVEAL URUTAN -->
+  <div id="screenReveal" class="hscreen">
+    <div class="reveal-top">
+      <div class="screen-badge" id="revealBadge">PENGUMUMAN</div>
+      <div class="reveal-pos-label" id="revealPosLabel">PERINGKAT</div>
+    </div>
+    <div id="revealCardWrap" class="reveal-card-wrap"></div>
+    <div id="revealProgressDots" class="reveal-progress-dots"></div>
+    <div class="space-hint" id="revealSpaceHint" style="opacity:0">Tekan <kbd>SPASI</kbd> untuk lanjut</div>
+  </div>
+
+  <!-- 5. BUILD-UP PEMENANG (baru) -->
+  <div id="screenBuildup" class="hscreen screen-buildup">
+    <div class="buildup-crown-anim" id="buildupCrown">👑</div>
+    <div class="buildup-title">DAN KETUA OSIS</div>
+    <div class="buildup-subtitle">CANDRA KIRANA ANGKATAN 35</div>
+    <div class="buildup-subtitle">PERIODE 2026–2027</div>
+    <div class="buildup-subtitle">SMP NEGERI 6 TEMANGGUNG</div>
+    <div class="buildup-dots">
+      <span class="bd-dot"></span>
+      <span class="bd-dot"></span>
+      <span class="bd-dot"></span>
+    </div>
+    <div class="buildup-reveal-text" id="buildupRevealText"></div>
+  </div>
+
+  <!-- 6. PEMENANG (dramatis, banyak teks) -->
+  <div id="screenPemenang" class="hscreen pemenang-screen">
+    <div class="pemenang-bg-glow"></div>
+    <div class="pemenang-top-ribbon">🎊 SELAMAT 🎊</div>
+    <div class="pemenang-crown-wrap">
+      <div class="pemenang-crown">👑</div>
+      <div class="pemenang-crown-rays"></div>
+    </div>
+    <div class="pemenang-badge-row">
+      <span class="pemenang-badge">✦ KETUA &amp; WAKIL KETUA OSIS TERPILIH ✦</span>
+    </div>
+    <div class="pemenang-org-top">OSIS CANDRA KIRANA &bull; ANGKATAN 35 &bull; PERIODE 2026–2027 &bull; SPENASIX</div>
+    <div id="pemenangFotoWrap" class="pemenang-foto-wrap"></div>
+    <div class="pemenang-nomor" id="pemenangNomor"></div>
+    <div class="pemenang-nama" id="pemenangNama"></div>
+    <div class="pemenang-suara" id="pemenangSuara"></div>
+    <div class="pemenang-quote" id="pemenangQuote"></div>
+    <div class="pemenang-tagline">
+      Selamat atas kepercayaan yang diberikan oleh seluruh warga SPENASIX.<br>
+      Jalankan amanah dengan sepenuh hati, penuh integritas, dan semangat yang membara! 🔥
+    </div>
+  </div>
+
+  <!-- 7. UCAPAN & HARAPAN (baru) -->
+  <div id="screenUcapan" class="hscreen screen-ucapan">
+    <div class="ucapan-title">💌 PESAN &amp; HARAPAN</div>
+    <div class="ucapan-subtitle">Untuk Ketua &amp; Wakil Ketua OSIS Terpilih Candra Kirana Angkatan 35</div>
+    <div class="ucapan-messages" id="ucapanMessages"></div>
+    <div class="ucapan-logo-wrap" id="ucapanLogoWrap"></div>
+    <div class="ucapan-org">OSIS Candra Kirana &bull; Angkatan 35 &bull; SMP Negeri 6 Temanggung &bull; 2026–2027</div>
+  </div>
+
+  <!-- 8. REKAP AKHIR -->
+  <div id="screenHasil" class="hscreen">
+    <div class="screen-badge-row"><span class="screen-badge">✦ REKAP AKHIR PEMILIHAN ✦</span></div>
+    <div class="screen-big-title" style="font-size:clamp(1rem,2.5vw,1.6rem);margin-bottom:.75rem">HASIL LENGKAP PEMILIHAN KETUA OSIS ANGKATAN 35</div>
+    <div class="hasil-two-col">
+      <div class="hasil-table-col">
+        <table class="hasil-tbl">
+          <thead><tr><th>#</th><th>Foto</th><th>Pasangan</th><th>Suara</th><th>%</th></tr></thead>
+          <tbody id="hasilTbody"></tbody>
+        </table>
+        <div class="hasil-stats-row" id="hasilStatsRow"></div>
+      </div>
+      <div class="hasil-chart-col">
+        <canvas id="donutCanvas" width="240" height="240"></canvas>
+        <div id="donutLegend" class="donut-legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. PENUTUP -->
+  <div id="screenPenutup" class="hscreen screen-penutup">
+    <div class="penutup-emoji">🎉</div>
+    <div class="penutup-title">Selamat kepada Pasangan Terpilih!</div>
+    <div id="penutupLogoWrap" class="penutup-logo-wrap"></div>
+    <div class="penutup-winner-name" id="penutupWinnerName"></div>
+    <div class="penutup-org">OSIS Candra Kirana &bull; Angkatan 35 &bull; Periode 2026–2027 &bull; SMP Negeri 6 Temanggung</div>
+    <div class="penutup-rekap" id="penutupRekap"></div>
+    <div class="penutup-closing">
+      Terima kasih kepada seluruh siswa, guru, dan staf yang telah berpartisipasi<br>
+      dalam pesta demokrasi SPENASIX hari ini. Hidup SPENASIX! 💛
+    </div>
+    <div class="penutup-btns">
+      <button class="btn-hasil btn-hasil-gold" onclick="startPengumuman()">↺ Ulangi</button>
+      <button class="btn-hasil btn-hasil-outline" onclick="exitFS()">Keluar Fullscreen</button>
+      <a href="admin.html" class="btn-hasil btn-hasil-outline" style="text-decoration:none">Admin Panel</a>
+    </div>
+  </div>
+
+  <!-- SERI -->
+  <div id="screenSeri" class="hscreen seri-screen">
+    <div class="seri-icon">⚖</div>
+    <div class="seri-title">HASIL SERI!</div>
+    <div class="seri-text">Dua atau lebih pasangan memperoleh jumlah suara yang sama.<br>Diperlukan musyawarah dan keputusan panitia pelaksana.</div>
+    <div id="seriCardsWrap" class="seri-cards-wrap"></div>
+    <button class="btn-hasil btn-hasil-outline" onclick="exitFS()" style="margin-top:1.5rem">Keluar</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/main.js"></script>
+<script src="js/hasil.js"></script>
+
+<!-- Scroll Reveal Animation -->
+<script>
+(function(){
+    var els = document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-pop');
+    if(!els.length) return;
+    var io = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    els.forEach(function(el){ io.observe(el); });
+})();
+</script>
+</body>
+</html>

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Terminal Bilik Voting - OSIS Candra Kirana SPENASIX Divisi 9</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/animations.css">
     <link rel="stylesheet" href="css/vote.css">
     <link rel="stylesheet" href="css/room.css">
 </head>
@@ -100,7 +101,7 @@
                     </div>
 
                     <div style="background:#ffffff; padding:1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); margin-bottom:1.5rem;">
-                        <h2 class="card-title" style="margin:0;">Silakan Pilih Kandidat Ketua OSIS</h2>
+                        <h2 class="card-title" style="margin:0;">Silakan Pilih Pasangan Calon Ketua & Wakil Ketua OSIS</h2>
                         <p class="card-subtitle" style="margin:0.25rem 0 0 0;">Tekan tombol di bawah foto kandidat yang Anda pilih.</p>
                     </div>
 
@@ -115,9 +116,16 @@
                     <div class="success-icon">✅</div>
                     <h2 class="success-title">SUARA BERHASIL TERCATAT</h2>
                     <p class="success-message">
-                        Terima kasih telah berpartisipasi dalam Pemilihan OSIS Candra Kirana SPENASIX Divisi 9.<br><br>
-                        Silakan tinggalkan bilik. Layar akan kembali siap dalam <strong id="autoResetCountdownText">5</strong> detik.
+                        Terima kasih telah berpartisipasi dalam Pemilihan OSIS Candra Kirana SPENASIX Divisi 9.
                     </p>
+                    <div class="success-thankyou-box">
+                        <span class="success-thankyou-icon">👋</span>
+                        <span id="roomThankyouMsg">Silakan menuju tempat selanjutnya!</span>
+                    </div>
+                    <p class="success-note" style="margin-top:0.5rem;">
+                        Layar kembali siap dalam <strong id="autoResetCountdownText">5</strong> detik.
+                    </p>
+                    <p class="success-note">🔒 Kerahasiaan pilihan Anda dijamin oleh sistem.</p>
                 </div>
 
             </div>
@@ -192,5 +200,17 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/main.js"></script>
     <script src="js/room.js"></script>
+
+    <!-- Scroll Reveal Animation -->
+    <script>
+    (function(){
+        var els = document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-pop');
+        if(!els.length) return;
+        var io = new IntersectionObserver(function(entries){
+            entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+        }, { threshold: 0.12 });
+        els.forEach(function(el){ io.observe(el); });
+    })();
+    </script>
 </body>
 </html>

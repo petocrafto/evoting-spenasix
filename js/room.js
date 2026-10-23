@@ -446,7 +446,7 @@ function renderRoomCandidateGrid() {
                 <h3 class="candidate-name">${escapeHtml(c.nama)}</h3>
                 <p class="candidate-visi"><strong>Visi:</strong> ${escapeHtml(c.visi)}</p>
                 <button type="button" class="btn btn-primary btn-block" style="margin-top:auto;" onclick="selectRoomCandidate('${c.id}')">
-                    Pilih Kandidat ${c.nomor_urut}
+                    Pilih Paslon ${c.nomor_urut}
                 </button>
             </div>
         `;
@@ -494,7 +494,11 @@ async function confirmRoomVoteSubmission() {
             closeRoomConfirmationModal();
             showToast('Suara berhasil tercatat!', 'success');
 
-            // Cegah submit ganda: pilihan dibersihkan & sesi lokal dikunci
+            // Cegah submit ganda: pilihan dibersihkan & sesi lokal dikunci.
+            // ignoredSessionId diset agar auto-refresh tidak menghidupkan ulang sesi ini.
+            ignoredSessionId = activeSession ? activeSession.id : null;
+            activeSession = null;
+            activeStudent = null;
             roomSelectedCandidateId = null;
             roomPhase = 'SUCCESS';
 

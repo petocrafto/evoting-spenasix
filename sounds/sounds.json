@@ -1,0 +1,8 @@
+{
+  "intro":    { "url": "sounds/intro.mp3",    "label": "Intro / Pembukaan",      "loop": false, "note": "Dimainkan sekali saat Opening (fase 1)" },
+  "drumroll": { "url": "sounds/drumroll.mp3", "label": "Drumroll / Ketegangan",  "loop": true,  "note": "LOOP saat Ketegangan (fase 3) & Build-up (fase 5), berhenti saat fase selesai" },
+  "tick":     { "url": "sounds/tick.mp3",     "label": "Tick / Hitung",          "loop": false, "note": "Dimainkan sekali per reveal peringkat non-pemenang (fase 4)" },
+  "reveal":   { "url": "sounds/reveal.mp3",   "label": "Reveal / Fanfare",       "loop": false, "note": "Dimainkan sekali saat reveal pemenang (fase 4, peringkat 1)" },
+  "menang":   { "url": "sounds/menang.mp3",   "label": "Pemenang / Victory",     "loop": false, "note": "Dimainkan sekali saat layar pemenang (fase 6) & penutup (fase 9)" },
+  "applause": { "url": "sounds/applause.mp3", "label": "Tepuk Tangan",           "loop": true,  "note": "LOOP saat Ucapan (fase 7), berhenti saat fase selesai; dimainkan sekali (tanpa loop) saat Hasil (fase 8)" }
+}

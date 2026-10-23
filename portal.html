@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Menu Portal - E-Voting OSIS Candra Kirana SPENASIX Divisi 9</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/animations.css">
     <style>
-        .portal-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1.5rem;
@@ -23,11 +23,9 @@
             align-items: center;
             justify-content: space-between;
             box-shadow: var(--shadow-sm);
-            transition: transform 0.15s ease, border-color 0.15s ease;
         }
         .portal-card:hover {
             border-color: var(--primary-blue);
-            transform: translateY(-3px);
         }
         .portal-icon {
             font-size: 3rem;
@@ -99,7 +97,7 @@
     <main class="main-container">
 
         <div class="hero-banner">
-            <h1 class="hero-title">Pemilihan Ketua OSIS Candra Kirana</h1>
+            <h1 class="hero-title">Pemilihan Ketua & Wakil Ketua OSIS Candra Kirana</h1>
             <p class="hero-sub">SPENASIX • Divisi 9</p>
             <p style="font-size: 0.95rem; max-width: 600px; margin: 0 auto 1.5rem auto; color: #e2e8f0;">
                 Selamat datang di portal e-voting resmi. Gunakan ID Card dengan QR Code atau mintalah bantuan panitia di Mode Bilik Voting.
@@ -163,7 +161,7 @@
         </div>
 
         <!-- Rules & Privacy Guide Card -->
-        <div class="card" style="margin-top: 2rem;">
+        <div class="card reveal" style="margin-top: 2rem;">
             <div class="card-header">
                 <h3 class="card-title">Prinsip &amp; Keamanan Pemilihan</h3>
             </div>
@@ -186,5 +184,17 @@
     <script src="js/config.js"></script>
     <script src="js/supabase-client.js"></script>
     <script src="js/main.js"></script>
+
+    <!-- Scroll Reveal Animation -->
+    <script>
+    (function(){
+        var els = document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-pop');
+        if(!els.length) return;
+        var io = new IntersectionObserver(function(entries){
+            entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+        }, { threshold: 0.12 });
+        els.forEach(function(el){ io.observe(el); });
+    })();
+    </script>
 </body>
 </html>

@@ -10,6 +10,9 @@ let parsedImportStudents = [];
 let allClasses = [];
 let selectedStudentIds = new Set();
 let selectedCandidateIds = new Set();
+// Map untuk tombol "Tugaskan Ke Bilik" — menghindari masalah apostrofe
+// pada nama siswa di dalam string onclick HTML.
+let _assignStudentMap = {};
 // Auto-refresh dashboard: agar hasil suara kandidat selalu terbaru tanpa refresh manual
 let dashboardRefreshInterval = null;
 let isDashboardLoading = false;
@@ -129,6 +132,7 @@ function switchTab(tabName) {
     if (tabName === 'rooms') loadRoomsTab();
     if (tabName === 'election') loadElectionTab();
     if (tabName === 'audit') loadAuditTab();
+    if (tabName === 'testing') loadTestingTab();
 }
 
 /* ==========================================
@@ -416,7 +420,8 @@ function buildTallyResultTable(tally, totalSuara) {
             </td>
             <td>
                 <strong style="display:block;">${escapeHtml(t.nama)}</strong>
-                <span class="text-muted" style="font-size:0.78rem;">Kandidat Nomor Urut ${noUrut}</span>
+                ${t.wakil_nama ? `<span style="font-size:.78rem;color:var(--text-muted);">Wakil: ${escapeHtml(t.wakil_nama)}</span>` : ''}
+                <span class="text-muted" style="font-size:0.78rem;display:block;">Pasangan Nomor Urut ${noUrut}</span>
             </td>
             <td style="text-align:right;">
                 <strong class="result-row-count" style="color:${warna};">${suara}</strong>
@@ -548,7 +553,13 @@ async function filterAssignStudentList() {
         return;
     }
 
-    students.forEach(s => {
+    // Reset map setiap kali tabel dimuat ulang
+    _assignStudentMap = {};
+
+    students.forEach((s, idx) => {
+        // Simpan data siswa ke map agar nama dengan apostrofe tidak memecah string onclick
+        _assignStudentMap[idx] = { id: s.id, nama: s.nama, nis: s.nis, kelas: s.kelas };
+
         const tr = document.createElement('tr');
         const isEligible = !s.has_voted && s.voting_status !== 'VOTED';
 
@@ -559,12 +570,18 @@ async function filterAssignStudentList() {
             <td><span class="badge badge-${s.voting_status === 'VOTED' ? 'voted' : s.voting_status === 'IN_PROGRESS' ? 'in-progress' : 'not-voted'}">${s.voting_status}</span></td>
             <td>
                 ${isEligible 
-                    ? `<button type="button" class="btn btn-sm btn-primary" onclick="prepareAssignModal('${s.id}', '${escapeHtml(s.nama)}', '${escapeHtml(s.nis)}', '${escapeHtml(s.kelas)}')">Tugaskan Ke Bilik</button>`
+                    ? `<button type="button" class="btn btn-sm btn-primary" onclick="prepareAssignModalByIdx(${idx})">Tugaskan Ke Bilik</button>`
                     : `<span class="text-muted" style="font-size:0.8rem;">Sudah Voting</span>`}
             </td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+function prepareAssignModalByIdx(idx) {
+    const s = _assignStudentMap[idx];
+    if (!s) { showToast('Data siswa tidak ditemukan.', 'error'); return; }
+    prepareAssignModal(s.id, s.nama, s.nis, s.kelas);
 }
 
 async function prepareAssignModal(studentId, name, nis, kelas) {
@@ -1393,17 +1410,12 @@ async function createNewVotingRoom(event) {
 
     try {
         const client = getSupabaseClient();
-        // Compute SHA-256 hash client-side for storing
         const encoder = new TextEncoder();
-        const data = encoder.encode(pin);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const pinHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(pin));
+        const pinHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
 
         const { error } = await client.from('voting_rooms').insert([{
-            room_code: code,
-            pin_hash: pinHash,
-            status: 'OFFLINE'
+            room_code: code, pin_hash: pinHash, status: 'OFFLINE'
         }]);
 
         if (error) {
@@ -1418,6 +1430,125 @@ async function createNewVotingRoom(event) {
         console.error('Create room error:', err);
         showToast('Terjadi kesalahan saat membuat bilik.', 'error');
     }
+}
+
+/* ==========================================
+   TAB 8: MODE UJI COBA H-1 & TESTING
+   ========================================== */
+
+function showTestingProgress(label, pct) {
+    const wrap = document.getElementById('testingProgressWrap');
+    const bar = document.getElementById('testingProgressBar');
+    const lbl = document.getElementById('testingProgressLabel');
+    const result = document.getElementById('testingResultBox');
+    if (wrap) wrap.style.display = 'block';
+    if (bar) bar.style.width = pct + '%';
+    if (lbl) lbl.textContent = label;
+    if (result) result.style.display = 'none';
+}
+
+function showTestingResult(msg, isError) {
+    const wrap = document.getElementById('testingProgressWrap');
+    const result = document.getElementById('testingResultBox');
+    if (wrap) wrap.style.display = 'none';
+    if (result) {
+        result.style.display = 'block';
+        result.style.background = isError ? '#fef2f2' : '#f0fdf4';
+        result.style.borderColor = isError ? '#fecaca' : '#86efac';
+        result.style.color = isError ? '#991b1b' : '#166534';
+        result.textContent = msg;
+    }
+}
+
+async function adminGenerateTestData() {
+    if (!confirm('Generate 700 siswa dummy (kelas TEST-xx)? Data dummy lama dihapus dahulu.')) return;
+    showTestingProgress('Membuat 700 siswa dummy...', 30);
+    try {
+        const response = await callRpc('generate_test_data');
+        if (response && response.success) {
+            showTestingProgress('Selesai!', 100);
+            setTimeout(() => showTestingResult('✅ ' + response.message, false), 400);
+            loadDashboardStats();
+        } else {
+            showTestingResult('❌ ' + (response?.message || 'Gagal.'), true);
+        }
+    } catch (err) { showTestingResult('❌ Error: ' + err.message, true); }
+}
+
+async function adminSimulateTestVotes() {
+    if (!confirm('Simulasikan suara acak untuk semua siswa dummy?')) return;
+    showTestingProgress('Mensimulasikan suara dummy (mungkin 10-30 detik)...', 10);
+    try {
+        const bar = document.getElementById('testingProgressBar');
+        let pct = 10;
+        const fp = setInterval(() => { pct = Math.min(pct+5,90); if(bar) bar.style.width=pct+'%'; }, 800);
+        const response = await callRpc('simulate_test_votes');
+        clearInterval(fp);
+        if (response && response.success) {
+            showTestingProgress('Selesai!', 100);
+            setTimeout(() => showTestingResult('✅ ' + response.message, false), 400);
+            loadDashboardStats();
+        } else { showTestingResult('❌ ' + (response?.message || 'Gagal.'), true); }
+    } catch (err) { showTestingResult('❌ Error: ' + err.message, true); }
+}
+
+async function adminCleanupTestData() {
+    if (!confirm('Hapus semua siswa dummy (kelas TEST-xx)?\nNote: Ballot tidak dihapus otomatis — gunakan Reset Suara di tab Election.')) return;
+    showTestingProgress('Membersihkan data siswa dummy...', 50);
+    try {
+        const response = await callRpc('cleanup_test_data');
+        if (response && response.success) {
+            showTestingProgress('Selesai!', 100);
+            setTimeout(() => showTestingResult('✅ ' + response.message, false), 400);
+            loadDashboardStats();
+        } else { showTestingResult('❌ ' + (response?.message || 'Gagal.'), true); }
+    } catch (err) { showTestingResult('❌ Error: ' + err.message, true); }
+}
+
+async function loadTestingTab() {
+    try {
+        const client = getSupabaseClient();
+        if (!client) return;
+        const { data } = await client.from('election_settings')
+            .select('logo_url,thankyou_message,cooldown_seconds').single();
+        if (data) {
+            const logoEl = document.getElementById('settingLogoUrl');
+            const msgEl = document.getElementById('settingThankyouMsg');
+            const cdEl = document.getElementById('settingCooldown');
+            if (logoEl && data.logo_url) logoEl.value = data.logo_url;
+            if (msgEl && data.thankyou_message) msgEl.value = data.thankyou_message;
+            if (cdEl && data.cooldown_seconds) cdEl.value = data.cooldown_seconds;
+        }
+    } catch (e) { /* ignore */ }
+}
+
+async function adminSaveElectionSettings() {
+    const logoUrl = document.getElementById('settingLogoUrl')?.value.trim() || null;
+    const thankyouMsg = document.getElementById('settingThankyouMsg')?.value.trim() || null;
+    const cooldown = parseInt(document.getElementById('settingCooldown')?.value) || null;
+    const resultEl = document.getElementById('settingsSaveResult');
+    if (resultEl) { resultEl.textContent = 'Menyimpan...'; resultEl.style.color = 'var(--text-muted)'; }
+    try {
+        const response = await callRpc('update_election_settings', {
+            p_logo_url: logoUrl, p_thankyou_message: thankyouMsg, p_cooldown_seconds: cooldown
+        });
+        if (response && response.success) {
+            if (resultEl) { resultEl.textContent = '✅ ' + response.message; resultEl.style.color = 'var(--status-success)'; }
+            if (logoUrl) applyLogoToHeader(logoUrl);
+        } else {
+            if (resultEl) { resultEl.textContent = '❌ ' + (response?.message||'Gagal.'); resultEl.style.color='var(--status-danger)'; }
+        }
+    } catch (err) {
+        if (resultEl) { resultEl.textContent = '❌ Error: ' + err.message; resultEl.style.color='var(--status-danger)'; }
+    }
+}
+
+function applyLogoToHeader(url) {
+    document.querySelectorAll('.brand-logo').forEach(el => {
+        if (el.tagName === 'A' || el.tagName === 'DIV') {
+            el.innerHTML = '<img src="' + url + '" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:4px;" onerror="this.remove()">';
+        }
+    });
 }
 
 function generateRandomPin() {
@@ -1474,7 +1605,7 @@ function describeRpcError(err, fallback) {
     const code = err.code || '';
     // 42883 = undefined_function, PGRST202 = function tidak ditemukan di schema cache PostgREST
     if (code === '42883' || code === 'PGRST202' || /does not exist|could not find the function|schema cache/i.test(raw)) {
-        return `Fungsi database belum terpasang di Supabase (${raw}). Jalankan migrasi terbaru (20261005 -> 20261006 -> 20261007 -> 20261008 -> 20261009) di Supabase SQL Editor.`;
+        return `Fungsi database belum terpasang di Supabase (${raw}). Jalankan semua migrasi (20261005 → 20261022) di Supabase SQL Editor.`;
     }
     return `${fallback} (${raw})`;
 }

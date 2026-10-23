@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * Sinkronkan indikator tahapan voting (1 Verifikasi -> 2 Pilih Kandidat -> 3 Selesai)
+ * Sinkronkan indikator tahapan voting (1 Verifikasi -> 2 Pilih Paslon -> 3 Selesai)
  * @param {number} activeStep Langkah yang sedang aktif (1-3)
  */
 function updateVoteStep(activeStep) {
@@ -187,12 +187,12 @@ async function onQrScanSuccess(decodedText) {
     // Extracted raw QR code text or URL
     console.log('Scanned QR:', decodedText);
 
-    // Extract 4-digit NIS from raw text or URL parameter ?nis=1234
+    // Extract NIS (1-6 digit) from raw text or URL parameter ?nis=XXXX
     let nis = null;
-    if (/^\d{4}$/.test(decodedText.trim())) {
+    if (/^\d{1,6}$/.test(decodedText.trim())) {
         nis = decodedText.trim();
     } else {
-        const match = decodedText.match(/nis=(\d{4})/i);
+        const match = decodedText.match(/[?&]nis=(\d{1,6})/i);
         if (match) nis = match[1];
     }
 
@@ -285,15 +285,23 @@ async function handleVerifyNis(nis) {
         }
 
         // 2. Fetch Student Data by NIS
+        // Gunakan maybeSingle() agar "tidak ditemukan" tidak dianggap error —
+        // sehingga kode rahasia pemilih tamu tetap bisa diproses dengan benar.
         const { data: student, error: studentErr } = await client
             .from('students')
             .select('*')
             .eq('nis', nis)
-            .single();
+            .maybeSingle();
 
-        if (studentErr || !student) {
-            // Kode rahasia panitia: pemilih yang belum/tidak terdaftar diarahkan ke
-            // form pengisian data MANUAL (nama, tipe, kelas) sebagai "Pemilih Tamu".
+        if (studentErr) {
+            // Error jaringan / DB yang sesungguhnya
+            showToast('Terjadi kesalahan saat memverifikasi NIS. Coba lagi.', 'error');
+            showNisError('Gagal memverifikasi NIS.');
+            return;
+        }
+
+        if (!student) {
+            // Tidak ditemukan di DB — cek apakah ini kode rahasia pemilih tamu
             if (nis === getGuestVoteCode()) {
                 openGuestDataStep();
                 return;
@@ -541,7 +549,7 @@ function renderCandidatesGrid(candidates) {
                 ${c.misi && c.misi.length ? `<button type="button" class="candidate-misi-toggle" onclick="toggleMisi('${c.id}')">📋 Lihat Misi ▼</button>` : ''}
                 ${misiHtml}
                 <button type="button" class="btn btn-primary btn-block" style="margin-top:auto;" onclick="selectCandidate('${c.id}')">
-                    Pilih Kandidat ${c.nomor_urut}
+                    Pilih Paslon ${c.nomor_urut}
                 </button>
             </div>
         `;
@@ -568,7 +576,7 @@ function selectCandidate(candidateId) {
     if (selectedCard) selectedCard.classList.add('selected');
 
     // Populate Modal
-    document.getElementById('confirmCandidateNum').textContent = `Kandidat 0${candidate.nomor_urut}`;
+    document.getElementById('confirmCandidateNum').textContent = `Paslon 0${candidate.nomor_urut}`;
     document.getElementById('confirmCandidateName').textContent = candidate.nama;
 
     // Show Modal
@@ -591,18 +599,27 @@ async function confirmVoteSubmission() {
     try {
         // Pemilih tamu memakai RPC khusus (validasi kode di server + data manual
         // nama/tipe/kelas), sedangkan siswa terdaftar memakai RPC QR/NIS biasa.
-        const response = currentStudent.isGuest
-            ? await callRpc('submit_vote_guest', {
+        // Pemilih guru memakai RPC submit_vote_guru.
+        let response;
+        if (currentStudent.isGuru) {
+            response = await callRpc('submit_vote_guru', {
+                p_nama_guru: currentStudent.nama,
+                p_candidate_id: selectedCandidateId
+            });
+        } else if (currentStudent.isGuest) {
+            response = await callRpc('submit_vote_guest', {
                 p_code: getGuestVoteCode(),
                 p_candidate_id: selectedCandidateId,
                 p_nama: currentStudent.nama,
                 p_kelas: currentStudent.kelas,
                 p_tipe: currentStudent.tipe
-            })
-            : await callRpc('submit_vote_qr', {
+            });
+        } else {
+            response = await callRpc('submit_vote_qr', {
                 p_nis: currentStudent.nis,
                 p_candidate_id: selectedCandidateId
             });
+        }
 
         if (response && response.success) {
             closeConfirmationModal();
@@ -612,9 +629,13 @@ async function confirmVoteSubmission() {
             // sehingga tombol konfirmasi tidak dapat mengirim suara kedua kali.
             selectedCandidateId = null;
             resetGuestDataForm();
+            showGuruDataError && showGuruDataError('');
 
             document.getElementById('stepCandidateSelect').style.display = 'none';
             document.getElementById('stepSuccess').style.display = 'block';
+
+            // Load pesan terima kasih dari settings (jika ada)
+            loadThankyouMessage();
 
             updateVoteStep(3);
 
@@ -688,6 +709,9 @@ function returnToScanStep() {
     const guestPanel = document.getElementById('stepGuestData');
     if (guestPanel) guestPanel.style.display = 'none';
 
+    const guruPanel = document.getElementById('stepGuruData');
+    if (guruPanel) guruPanel.style.display = 'none';
+
     const nisInput = document.getElementById('nisInput');
     if (nisInput) nisInput.value = '';
 
@@ -717,4 +741,157 @@ function returnToScanStep() {
 
     // Kembali ke layar scan & nyalakan ulang kamera
     showNisInputStep();
+}
+
+/* ==========================================
+   MODE GURU — Guru/Staff voting tanpa NIS
+   Password panitia wajib sebelum akses form
+   ========================================== */
+
+/**
+ * Kode akses panitia untuk Mode Guru.
+ * Ganti nilai ini jika kode perlu diperbarui.
+ * Disimpan di sini (client-side) karena Mode Guru
+ * hanya menambah lapisan konfirmasi manual — bukan
+ * gating keamanan kritis; record tetap masuk DB dengan
+ * kategori GURU sehingga dapat diaudit panitia.
+ */
+const GURU_MODE_PASSWORD = 'pilketos2627';
+
+/**
+ * Tampilkan modal verifikasi password sebelum membuka form Mode Guru.
+ */
+function promptGuruPassword() {
+    const modal = document.getElementById('guruPasswordModal');
+    const input = document.getElementById('guruPasswordInput');
+    const errEl = document.getElementById('guruPasswordError');
+    if (!modal) { openGuruDataStep(); return; } // fallback jika modal tidak ada di HTML
+    if (input) input.value = '';
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    modal.style.display = 'flex';
+    setTimeout(() => { if (input) input.focus(); }, 120);
+}
+
+/**
+ * Tutup modal password Mode Guru tanpa membuka form.
+ */
+function closeGuruPasswordModal() {
+    const modal = document.getElementById('guruPasswordModal');
+    if (modal) modal.style.display = 'none';
+}
+
+/**
+ * Validasi password lalu buka form Mode Guru jika benar.
+ */
+function submitGuruPassword(event) {
+    if (event) event.preventDefault();
+    const input = document.getElementById('guruPasswordInput');
+    const errEl = document.getElementById('guruPasswordError');
+    const val = input ? input.value : '';
+
+    if (val !== GURU_MODE_PASSWORD) {
+        if (errEl) { errEl.textContent = 'Kode akses salah. Hubungi panitia.'; errEl.style.display = 'block'; }
+        if (input) { input.value = ''; input.focus(); }
+        return;
+    }
+
+    // Password benar — tutup modal dan buka form guru
+    closeGuruPasswordModal();
+    openGuruDataStep();
+}
+
+function openGuruDataStep() {
+    currentStudent = null;
+    selectedCandidateId = null;
+
+    const guruNameInput = document.getElementById('guruNameInput');
+    if (guruNameInput) guruNameInput.value = '';
+    showGuruDataError('');
+
+    document.getElementById('stepNisInput').style.display = 'none';
+    document.getElementById('stepGuestData').style.display = 'none';
+    document.getElementById('stepCandidateSelect').style.display = 'none';
+    document.getElementById('stepSuccess').style.display = 'none';
+    document.getElementById('stepGuruData').style.display = 'block';
+
+    updateVoteStep(1);
+    showToast('Mode Guru aktif. Masukkan nama lengkap Anda.', 'info');
+
+    if (guruNameInput) setTimeout(() => guruNameInput.focus(), 100);
+}
+
+function showGuruDataError(msg) {
+    const el = document.getElementById('guruDataErrorMessage');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.style.display = msg ? 'block' : 'none';
+}
+
+/**
+ * Submit form Mode Guru: validasi nama, lanjut ke step pilih kandidat.
+ * Suara akan dikirmkan via RPC submit_vote_guru saat konfirmasi.
+ */
+async function submitGuruDataForm(event) {
+    if (event) event.preventDefault();
+
+    const nameInput = document.getElementById('guruNameInput');
+    const nama = nameInput ? nameInput.value.trim() : '';
+
+    if (nama.length < 3) {
+        showGuruDataError('Nama lengkap minimal 3 karakter.');
+        showToast('Nama guru minimal 3 karakter.', 'error');
+        return;
+    }
+
+    showGuruDataError('');
+
+    currentStudent = {
+        isGuru: true,
+        nis: null,
+        nama: nama,
+        tipe: 'GURU',
+        kelas: 'GURU'
+    };
+
+    document.getElementById('displayStudentName').textContent = nama;
+    document.getElementById('displayStudentKelas').textContent = ' (Guru / Staff)';
+    document.getElementById('displayStudentNis').textContent = 'GURU';
+
+    await loadCandidates();
+
+    document.getElementById('stepGuruData').style.display = 'none';
+    document.getElementById('stepCandidateSelect').style.display = 'block';
+    updateVoteStep(2);
+}
+
+/**
+ * Cek apakah pemilih saat ini adalah Guru (untuk memilih RPC yang benar saat submit).
+ */
+function isGuruVoter() {
+    return currentStudent && currentStudent.isGuru === true;
+}
+
+/**
+ * Muat pesan "Terima kasih" dari election_settings.
+ * Jika tidak ada, tampilkan default.
+ */
+async function loadThankyouMessage() {
+    try {
+        const client = getSupabaseClient();
+        if (!client) return;
+        const { data } = await client
+            .from('election_settings')
+            .select('thankyou_message, cooldown_seconds')
+            .single();
+        if (data) {
+            const msgEl = document.getElementById('successThankyouMsg');
+            if (msgEl && data.thankyou_message) msgEl.textContent = data.thankyou_message;
+            // Override cooldown jika diset di DB
+            if (data.cooldown_seconds && typeof CONFIG !== 'undefined') {
+                CONFIG.SCAN_RESET_DELAY_MS = data.cooldown_seconds * 1000;
+            }
+        }
+    } catch (e) {
+        /* Abaikan error — pesan default tetap tampil */
+    }
 }

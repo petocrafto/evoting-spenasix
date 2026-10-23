@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#0f2942">
     <title>Voting ID Card - OSIS Candra Kirana SPENASIX Divisi 9</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/animations.css">
     <link rel="stylesheet" href="css/vote.css">
     <!-- Percepat koneksi ke CDN library scanner -->
     <link rel="preconnect" href="https://unpkg.com" crossorigin>
@@ -41,7 +42,7 @@
                 </li>
                 <li class="vote-step" id="voteStep2">
                     <span class="vote-step-dot">2</span>
-                    <span class="vote-step-label">Pilih Kandidat</span>
+                    <span class="vote-step-label">Pilih Paslon</span>
                 </li>
                 <li class="vote-step" id="voteStep3">
                     <span class="vote-step-dot">3</span>
@@ -92,6 +93,30 @@
                         Lanjutkan Voting →
                     </button>
                 </form>
+
+                <!-- Tombol Mode Guru — memerlukan password panitia -->
+                <div class="vote-divider"><span>pemilih guru / staff?</span></div>
+                <button type="button" class="btn btn-guru btn-block" onclick="promptGuruPassword()" style="margin-top:0.25rem;">
+                    🎓 Saya Guru / Staff Sekolah
+                </button>
+            </div>
+
+            <!-- ===== MODAL PASSWORD MODE GURU ===== -->
+            <div id="guruPasswordModal" class="guru-pw-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Verifikasi Mode Guru">
+                <div class="guru-pw-box">
+                    <div class="guru-pw-icon">🔒</div>
+                    <h3 class="guru-pw-title">Verifikasi Mode Guru</h3>
+                    <p class="guru-pw-desc">Masukkan kode akses panitia untuk menggunakan Mode Guru.</p>
+                    <form onsubmit="submitGuruPassword(event)" autocomplete="off">
+                        <input type="password" id="guruPasswordInput" class="form-control guru-pw-input"
+                            placeholder="Kode akses panitia" maxlength="30" autocomplete="off" required />
+                        <div id="guruPasswordError" class="nis-error-message" style="display:none"></div>
+                        <div class="guru-pw-btns">
+                            <button type="button" class="btn btn-secondary" onclick="closeGuruPasswordModal()">Batal</button>
+                            <button type="submit" class="btn btn-guru">Masuk →</button>
+                        </div>
+                    </form>
+                </div>
             </div>
 
             <!-- STEP 1B: FORM DATA PEMILIH TAMU (kode rahasia / tidak terdaftar) -->
@@ -137,6 +162,29 @@
                 </form>
             </div>
 
+            <!-- STEP 1C: FORM MODE GURU — input nama + pilih kandidat langsung -->
+            <div id="stepGuruData" class="card step-panel guru-card" style="display:none;">
+                <div class="guru-card-header">
+                    <span class="guru-badge-icon">🎓</span>
+                    <h2 class="card-title" style="margin:0;">Mode Pemilih Guru</h2>
+                </div>
+                <p class="card-subtitle" style="margin-bottom:1.25rem;">
+                    Sebagai Guru/Staff sekolah, masukkan nama lengkap Anda. Pilihan kandidat tetap <strong>anonim</strong> dan tercatat terpisah di dashboard admin.
+                </p>
+                <form onsubmit="submitGuruDataForm(event)" autocomplete="off">
+                    <div class="form-group">
+                        <label class="form-label" for="guruNameInput">Nama Lengkap Guru / Staff</label>
+                        <input type="text" id="guruNameInput" class="form-control" placeholder="Contoh: Bapak Ahmad Santoso, S.Pd"
+                            maxlength="80" autocomplete="off" required />
+                    </div>
+                    <div id="guruDataErrorMessage" class="nis-error-message"></div>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-lg" style="flex:1;" onclick="returnToScanStep()">[ KEMBALI ]</button>
+                        <button type="submit" id="btnGuruSubmit" class="btn btn-guru btn-lg" style="flex:2;">Lanjut Pilih Kandidat →</button>
+                    </div>
+                </form>
+            </div>
+
             <!-- STEP 2: CANDIDATE SELECTION -->
             <div id="stepCandidateSelect" class="step-panel" style="display:none;">
                 
@@ -153,8 +201,8 @@
                 </div>
 
                 <div class="candidate-header">
-                    <h2 class="candidate-header-title">Pilih Kandidat Ketua OSIS</h2>
-                    <p class="candidate-header-sub">Tekan tombol <strong>Pilih Kandidat</strong> di bawah foto pilihan Anda, lalu konfirmasi suara.</p>
+                    <h2 class="candidate-header-title">Pilih Pasangan Calon Ketua & Wakil Ketua OSIS</h2>
+                    <p class="candidate-header-sub">Tekan tombol <strong>Pilih Paslon</strong> di bawah foto pilihan Anda, lalu konfirmasi suara.</p>
                 </div>
 
                 <!-- Candidate Grid -->
@@ -169,8 +217,14 @@
                 <h2 class="success-title">SUARA BERHASIL TERCATAT</h2>
                 <p class="success-message">
                     Terima kasih telah berpartisipasi dalam Pemilihan OSIS Candra Kirana SPENASIX Divisi 9.<br><br>
-                    Suara Anda telah tersimpan secara aman dan anonim. Layar akan kembali ke mode scan dalam
-                    <strong id="successCountdownText">5</strong> detik untuk pemilih berikutnya.
+                    Suara Anda telah tersimpan secara aman dan anonim.
+                </p>
+                <div class="success-thankyou-box" id="successThankyouBox">
+                    <span class="success-thankyou-icon">👋</span>
+                    <span id="successThankyouMsg">Silakan menuju tempat selanjutnya!</span>
+                </div>
+                <p class="success-note" style="margin-top:0.75rem;">
+                    Layar kembali otomatis dalam <strong id="successCountdownText">5</strong> detik
                 </p>
                 <p class="success-note">🔒 Kerahasiaan pilihan Anda dijamin oleh sistem.</p>
                 <div class="success-actions">
@@ -190,7 +244,7 @@
             </div>
             <div style="text-align:center; padding:1rem 0;">
                 <p style="color:var(--text-muted); font-size:0.95rem;">Anda telah memilih:</p>
-                <div id="confirmCandidateNum" style="font-size:1.5rem; font-weight:800; color:var(--primary-navy); margin-top:0.25rem;">Kandidat 02</div>
+                <div id="confirmCandidateNum" style="font-size:1.5rem; font-weight:800; color:var(--primary-navy); margin-top:0.25rem;">Paslon 02</div>
                 <div id="confirmCandidateName" style="font-size:1.1rem; font-weight:700; color:var(--primary-blue); margin-bottom:1rem;">Budi Santoso & Partner</div>
                 <p style="font-size:0.875rem; color:var(--status-warning); background:#fff7ed; border:1px solid #ffedd5; padding:0.75rem; border-radius:var(--radius-sm); font-weight:600;">
                     ⚠️ Pastikan pilihan Anda sudah benar. Suara yang telah dikonfirmasi tidak dapat diubah.
@@ -216,5 +270,17 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/main.js"></script>
     <script src="js/vote.js"></script>
+
+    <!-- Scroll Reveal Animation -->
+    <script>
+    (function(){
+        var els = document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-pop');
+        if(!els.length) return;
+        var io = new IntersectionObserver(function(entries){
+            entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+        }, { threshold: 0.12 });
+        els.forEach(function(el){ io.observe(el); });
+    })();
+    </script>
 </body>
 </html>

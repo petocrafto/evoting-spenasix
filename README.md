@@ -6,9 +6,49 @@ Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, be
 1. **Metode ID Card / QR Code:** Siswa melakukan scan QR NIS 4 digit pada ID Card fisik (kartu absen asli) menggunakan kamera HP. Mengakses web (halaman awal `index.html`) akan **langsung menampilkan animasi loading singkat lalu otomatis membuka halaman voting** (`vote.html`) dengan **kamera otomatis aktif secara default**.
 2. **Mode Bilik Voting:** Panitia menetapkan siswa yang tidak membawa ID Card ke komputer bilik (`BILIK-01`, `BILIK-02`, dst.) yang menerima *assignment* secara *realtime* **sekaligus auto-refresh tiap 3 detik** (layar bilik tersinkron sendiri, tanpa perlu di-refresh manual) tanpa perlu input NIS/password di layar bilik. Aksi **🔓 Keluar Mode Bilik** pada terminal juga **dikunci PIN 6 digit bilik** (diverifikasi server) supaya perangkat bilik tidak bisa dikeluarkan sembarang orang.
 
+## 🆕 Fitur Terbaru (Update Oktober 2026)
+
+### 1. 🏆 Halaman Hasil Pemilihan Dramatis (`hasil.html`)
+Pengumuman hasil fullscreen bergaya panggung konser dengan 4 fase animasi:
+- **Fase 1 (Intro):** Logo sekolah + nama pemilihan + typewriter *"Saatnya mengumumkan hasil..."*
+- **Fase 2 (Counting):** Animasi menghitung suara dengan progress bar easing
+- **Fase 3 (Reveal):** Kartu pasangan kandidat muncul satu per satu (dari suara terkecil ke pemenang), menampilkan **foto Ketua + foto Wakil Ketua** berdampingan, progress dots di bawah
+- **Fase 4 (Stats):** Panel statistik final (total suara, partisipasi siswa, guru, tamu), konfetti emas
+- Tombol **Ulangi Animasi** dan **Keluar Fullscreen** tersedia di akhir
+- Dapat diakses melalui tombol **🏆 Hasil Pemilihan** (tombol emas) di admin dashboard
+
+### 2. 🎓 Mode Guru (`vote.html` → Mode Guru)
+Guru dan tamu tanpa NIS dapat memilih melalui formulir khusus:
+- Input nama guru manual (tanpa NIS/QR)
+- Pilihan kandidat sama seperti siswa
+- Suara diproses melalui RPC `submit_vote_guru` (SECURITY DEFINER)
+- Data dicatat dengan `kategori = 'GURU'` di tabel `students`
+
+### 3. 🧪 Mode Uji Coba H-1 (Tab "🧪 Mode Uji Coba" di Admin)
+Fitur simulasi sebelum hari-H tanpa risiko data asli:
+- **Generate 700 Siswa Dummy** — membuat 700 siswa kelas `TEST-xx` dengan nama acak
+- **Simulasi Suara Acak** — memberikan suara random ke semua siswa dummy (menguji performa DB + antrian)
+- **Bersihkan Data Dummy** — hapus semua siswa `TEST-xx` (ballot tidak dihapus otomatis, gunakan Reset Suara)
+- Progress bar animasi + pesan sukses/gagal
+
+### 4. ⚙️ Pengaturan Logo, Pesan, & Cooldown (Tab Uji Coba)
+Admin dapat mengatur:
+- **URL Logo Sekolah** — ditampilkan di halaman intro hasil pemilihan
+- **Pesan Terima Kasih** — pesan yang muncul di layar bilik setelah voting berhasil
+- **Cooldown Antar Voting** — jeda minimal (detik) antar sesi voting di bilik yang sama
+
+### 5. 👥 Format Pasangan Ketua + Wakil Ketua OSIS Angkatan 35
+Tabel `candidates` sekarang mendukung format pasangan:
+- Kolom `nama` = nama **Ketua OSIS**
+- Kolom `wakil_nama` = nama **Wakil Ketua OSIS**
+- Kolom `foto_url` = foto Ketua
+- Kolom `wakil_foto_url` = foto Wakil Ketua
+- Kartu reveal menampilkan kedua foto berdampingan dengan label "KETUA" / "WAKIL KETUA"
+- Statistik dashboard dan halaman hasil menampilkan nama pasangan lengkap
+
 ---
 
-## 🚀 Teknologi Utama
+
 
 - **Frontend:** HTML5, CSS3 Custom Properties, Vanilla JavaScript (ES6 Modules/Scripts), HTML5-QRCode Scanner.
 - **Backend & Database:** PostgreSQL via Supabase.
@@ -25,9 +65,10 @@ Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, be
 /
 ├── index.html               # Splash screen ringan + auto-redirect ke vote.html saat web dibuka
 ├── portal.html              # Menu portal (Voting, Bilik, Admin, Cetak ID Card)
-├── vote.html                # Halaman Voting QR Code (Kamera Aktif Default)
-├── voting-room.html         # Terminal Komputer Bilik Voting
-├── admin.html               # Portal Admin Panitia & Dashboard Realtime
+├── vote.html                # Halaman Voting QR Code + Mode Guru (tanpa NIS)
+├── voting-room.html         # Terminal Komputer Bilik Voting (success screen + pesan terima kasih)
+├── admin.html               # Portal Admin Panitia & Dashboard Realtime + tab Mode Uji Coba
+├── hasil.html               # Pengumuman Hasil Pemilihan fullscreen dramatis (4 fase animasi)
 ├── id-cards.html            # Generator & Printable ID Card Siswa + QR Code
 ├── data_siswa_contoh.csv    # File CONTOH SPREADSHEET Data Siswa
 ├── data_siswa_spenasix.csv  # Data SIAP IMPOR semua siswa (ekspor Dapodik, 763 siswa)
@@ -45,18 +86,21 @@ Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, be
 ├── data_siswa_9GH.csv       # Pasangan 9G + 9H (60 siswa)
 │
 ├── css/
-│   ├── style.css            # Base design system & official school identity
-│   ├── vote.css             # Grid kandidat, konfirmasi & halaman berhasil
+│   ├── style.css            # Base design system & official school identity (warm brown theme)
+│   ├── vote.css             # Grid kandidat, konfirmasi, success screen & Mode Guru
 │   ├── admin.css            # Tab navigation, data tables, import preview
+│   ├── hasil.css            # Layar hasil dramatis fullscreen (reveal card pasangan, konfetti)
 │   └── room.css             # Terminal bilik, PIN activation, modal PIN keluar & countdown timer
 │
 ├── js/
 │   ├── config.js            # Konfigurasi Supabase URL, Anon Key & interval auto-refresh
 │   ├── supabase-client.js   # Wrapper SDK Supabase & RPC caller
-│   ├── main.js              # Utility global (Escaping, Toast, Date)
-│   ├── vote.js              # Logika voting QR, camera scanner & atomic submission
-│   ├── room.js              # Logika terminal bilik, PIN activation, PIN keluar bilik, Realtime & auto-refresh 3 detik
-│   └── admin.js             # Dashboard admin (hasil suara lingkaran + auto-refresh), CRUD kandidat, assign bilik, import Excel & Auth
+│   ├── main.js              # Utility global (escapeHtml, Toast, Date)
+│   ├── vote.js              # Logika voting QR, camera scanner, Mode Guru & atomic submission
+│   ├── hasil.js             # Animasi dramatis hasil (intro→counting→reveal pasangan→stats)
+│   ├── room.js              # Logika terminal bilik, PIN activation, PIN keluar, Realtime & auto-refresh
+│   └── admin.js             # Dashboard (donut chart suara + wakil), CRUD kandidat, assign bilik,
+│                            #   import CSV, Mode Uji Coba H-1, pengaturan logo/pesan/cooldown & Auth
 │
 ├── scripts/
 │   ├── generate-qr.js       # Script Node.js pembentuk QR Code PNG (NIS 4 digit)
@@ -70,7 +114,9 @@ Sistem dirancang khusus untuk memenuhi standar kerahasiaan pemilihan sekolah, be
 │   │   ├── 20261008_guest_vote.sql            # RPC kode rahasia pemilih tamu (versi awal)
 │   │   ├── 20261009_guest_manual_voter.sql    # Kategori TAMU & data manual pemilih tamu
 │   │   ├── 20261010_guest_code_2513_and_room_autorefresh.sql  # Kode 2513, anti data ganda & Realtime bilik
-│   │   └── 20261011_room_exit_pin_lock.sql    # Keluar Mode Bilik wajib PIN bilik (kunci di server)
+│   │   ├── 20261011_room_exit_pin_lock.sql    # Keluar Mode Bilik wajib PIN bilik (kunci di server)
+│   │   ├── 20261022_guru_mode_logo_results.sql # Mode Guru, logo, cooldown, hasil publik & uji coba H-1
+│   │   └── 20261023_pasangan_ketua_wakil.sql  # Kolom wakil_nama & wakil_foto_url untuk pasangan kandidat
 │   └── seed.sql             # Data kandidat awal, bilik & contoh siswa
 │
 ├── .env.example             # Template variabel lingkungan
@@ -197,7 +243,19 @@ Beberapa error umum saat menjalankan migrasi beserta solusinya:
 
 - **`42710: policy "..." already exists`** — Terjadi bila `20261005` dijalankan ulang. File sudah dibuat idempotent (`DROP POLICY IF EXISTS` sebelum setiap `CREATE POLICY`), jadi cukup jalankan ulang seluruh file dari awal.
 - **`DELETE requires a WHERE clause` / `UPDATE requires a WHERE clause`** — Muncul saat memakai tombol **Reset Suara Saja** / **Reset Total**. Ini berasal dari guard extension **`pg_safeupdate`** milik Supabase yang menolak `DELETE`/`UPDATE` tanpa `WHERE`, termasuk di dalam fungsi `SECURITY DEFINER`. Fungsi `reset_votes_only()`, `reset_all_rooms()`, dan `reset_total_election()` sudah diberi `WHERE TRUE` agar lolos guard. **Jalankan ulang** `20261005_initial_schema.sql` dan `20261006_room_vote_management.sql` agar fungsi ter-`CREATE OR REPLACE` dengan versi terbaru.
-- **`function public.xxx() does not exist` / `PGRST202`** — Fungsi RPC belum terpasang karena migrasi yang mendefinisikannya belum dijalankan (atau berhenti di tengah karena error). Jalankan migrasi sesuai urutan `20261005` → `20261006` → `20261007` → `20261008` → `20261009` → `20261010`.
+9. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261022_guru_mode_logo_results.sql`.** File ini menambahkan:
+   - Kolom `logo_url`, `cooldown_seconds`, `thankyou_message` ke `election_settings`
+   - Kolom `kategori` ke `students` (SISWA/GURU/TAMU)
+   - RPC `update_election_settings`, `submit_vote_guru`, `get_public_results`
+   - RPC `generate_test_data`, `simulate_test_votes`, `cleanup_test_data` (Mode Uji Coba H-1)
+10. **[TAMBAHAN] Jalankan juga file `supabase/migrations/20261023_pasangan_ketua_wakil.sql`.** File ini menambahkan:
+    - Kolom `wakil_nama`, `wakil_foto_url` ke `candidates` (format pasangan Ketua + Wakil Ketua OSIS)
+    - Kolom `angkatan` ke `election_settings` (default `35`)
+    - Update `get_public_results()` — sertakan data wakil + angkatan untuk halaman hasil dramatis
+    - Update `get_admin_dashboard_stats()` — sertakan `wakil_nama` di tabel tally dashboard
+
+- **`function public.xxx() does not exist` / `PGRST202`** — Fungsi RPC belum terpasang karena migrasi yang mendefinisikannya belum dijalankan. Jalankan migrasi sesuai urutan `20261005` → `20261006` → `20261007` → `20261008` → `20261009` → `20261010` → `20261011` → `20261022` → `20261023`.
+- **`column candidates.wakil_nama does not exist`** — Migrasi `20261023_pasangan_ketua_wakil.sql` belum dijalankan. Jalankan file tersebut untuk menambahkan kolom wakil dan memperbarui RPC `get_public_results` & `get_admin_dashboard_stats`.
 - **`column students.kategori does not exist`** (atau gagal menyimpan pemilih tamu) — Migrasi `20261009_guest_manual_voter.sql` belum dijalankan. Fitur **Pemilih Tamu (input data manual)** membutuhkan kolom `kategori` serta kolom `nis` yang boleh NULL, jadi jalankan file migrasi tersebut di SQL Editor dan tunggu ±10 detik hingga skema PostgREST tersegarkan.
 - **`could not find the function ... in the schema cache`** — PostgREST sedang menyegarkan cache skema. Tunggu ±10 detik lalu ulangi; jika tetap muncul, gunakan tombol *Reload schema cache* pada Supabase Dashboard → *Settings* → *API*.
 - **Penugasan siswa atau hasil suara tidak muncul otomatis di layar bilik/dashboard (harus refresh manual)** — Tabel belum terdaftar pada publication Realtime. Jalankan `20261010_guest_code_2513_and_room_autorefresh.sql`, lalu pastikan **Realtime** aktif pada Supabase Dashboard → *Database* → *Replication* (`voting_rooms`, `voting_sessions`, `students`, `ballots`). Tanpa Realtime pun sistem tetap berjalan karena terminal bilik memakai **auto-refresh (polling) tiap 3 detik** dan dashboard admin tiap 5 detik.

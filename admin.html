@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal Admin - OSIS Candra Kirana SPENASIX Divisi 9</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/animations.css">
     <link rel="stylesheet" href="css/admin.css">
     <!-- SheetJS CDN for Excel/CSV Import -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -68,6 +69,8 @@
                 <button class="tab-btn" data-tab="rooms" onclick="switchTab('rooms')">🔑 Kelola Bilik & PIN</button>
                 <button class="tab-btn" data-tab="election" onclick="switchTab('election')">⚙️ Pengaturan Election</button>
                 <button class="tab-btn" data-tab="audit" onclick="switchTab('audit')">📜 Audit Logs</button>
+                <button class="tab-btn" data-tab="testing" onclick="switchTab('testing')" style="color:#f59e0b;">🧪 Mode Uji Coba</button>
+                <a href="hasil.html" target="_blank" class="tab-btn" style="background:linear-gradient(135deg,#d4af37,#f0d060);color:#3b1f0a;font-weight:800;text-decoration:none;" title="Buka halaman pengumuman hasil (fullscreen dramatis)">🏆 Hasil Pemilihan</a>
             </nav>
 
             <!-- TAB 1: DASHBOARD OVERVIEW -->
@@ -329,8 +332,8 @@
                 <div class="card">
                     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
-                            <h2 class="card-title">Daftar Kandidat Ketua OSIS</h2>
-                            <p class="card-subtitle">Kelola foto, nama, visi, dan misi kandidat yang akan tampil di 1 halaman layar voting siswa.</p>
+                            <h2 class="card-title">Daftar Pasangan Calon Ketua & Wakil Ketua OSIS</h2>
+                            <p class="card-subtitle">Kelola foto, nama, visi, dan misi pasangan calon (ketua & wakil) yang akan tampil di halaman voting siswa.</p>
                         </div>
                         <button type="button" class="btn btn-primary" onclick="openCandidateModal()">➕ Tambah Kandidat Baru</button>
                     </div>
@@ -468,6 +471,61 @@
                 </div>
             </div>
 
+            <!-- TAB 8: MODE UJI COBA H-1 -->
+            <div id="tab-testing" class="tab-pane" style="display:none;">
+                <div class="card" style="border-top:4px solid #f59e0b;">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">🧪 Mode Uji Coba H-1 (Load Testing)</h2>
+                            <p class="card-subtitle">Generate ~700 siswa dummy, simulasikan voting, lalu bersihkan. Tidak menyentuh data siswa asli.</p>
+                        </div>
+                    </div>
+                    <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:1rem;margin-bottom:1.25rem;font-size:0.875rem;color:#92400e;font-weight:600;">
+                        ⚠️ Siswa dummy ditandai dengan kelas <code>TEST-xx</code>. Setelah selesai uji coba, gunakan tombol Bersihkan Data Uji. Ballot dummy tidak bisa dibedakan dari ballot asli — gunakan Reset Suara di tab Election setelah cleanup.
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.25rem;">
+                        <button type="button" class="btn btn-secondary" onclick="adminGenerateTestData()">
+                            📋 1. Generate 700 Siswa Dummy
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="adminSimulateTestVotes()">
+                            🗳️ 2. Simulasikan Semua Suara Dummy
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="adminCleanupTestData()">
+                            🗑️ 3. Bersihkan Data Uji
+                        </button>
+                    </div>
+                    <div id="testingProgressWrap" style="display:none;margin-bottom:1rem;">
+                        <div style="background:#e2e8f0;border-radius:999px;height:10px;overflow:hidden;">
+                            <div id="testingProgressBar" style="height:100%;background:linear-gradient(90deg,#f59e0b,#fcd34d);border-radius:999px;width:0%;transition:width 0.3s ease;"></div>
+                        </div>
+                        <p id="testingProgressLabel" style="font-size:0.85rem;color:var(--text-muted);margin-top:0.5rem;font-weight:600;"></p>
+                    </div>
+                    <div id="testingResultBox" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem;font-size:0.9rem;font-weight:600;color:#166534;"></div>
+                </div>
+
+                <!-- Pengaturan Logo & Pesan di sini juga -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">🖼️ Pengaturan Logo & Pesan Selamat</h2>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">URL Logo Sekolah</label>
+                        <input type="url" id="settingLogoUrl" class="form-control" placeholder="https://domain.com/logo.png" />
+                        <small style="color:var(--text-muted);font-size:0.75rem;">Tampil di header semua halaman dan di halaman pengumuman hasil.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pesan Terima Kasih (Setelah Voting)</label>
+                        <input type="text" id="settingThankyouMsg" class="form-control" placeholder="Silakan menuju tempat selanjutnya!" maxlength="150" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cooldown Otomatis Layar (detik, 3-60)</label>
+                        <input type="number" id="settingCooldown" class="form-control" min="3" max="60" value="5" style="max-width:120px;" />
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="adminSaveElectionSettings()">💾 Simpan Pengaturan</button>
+                    <div id="settingsSaveResult" style="margin-top:0.75rem;font-size:0.875rem;font-weight:600;"></div>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -557,5 +615,17 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/main.js"></script>
     <script src="js/admin.js"></script>
+
+    <!-- Scroll Reveal Animation -->
+    <script>
+    (function(){
+        var els = document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-pop');
+        if(!els.length) return;
+        var io = new IntersectionObserver(function(entries){
+            entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+        }, { threshold: 0.12 });
+        els.forEach(function(el){ io.observe(el); });
+    })();
+    </script>
 </body>
 </html>

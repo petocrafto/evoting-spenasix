@@ -34,8 +34,8 @@ function showToast(message, type = 'info', duration = 4000) {
     
     let icon = 'ℹ️';
     if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '⚠️';
-    if (type === 'warning') icon = '🔔';
+    if (type === 'error') icon = '❌';
+    if (type === 'warning') icon = '⚠️';
 
     toast.innerHTML = `<span class="toast-icon">${icon}</span> <span class="toast-text">${escapeHtml(message)}</span>`;
     
